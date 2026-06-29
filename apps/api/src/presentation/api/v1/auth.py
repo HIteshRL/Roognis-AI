@@ -3,9 +3,9 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, Request
 
 from src.application.dtos.auth import LoginRequest, RegisterRequest
+from src.application.dtos.user import UserResponse
 from src.application.interfaces.dependencies import get_auth_service, get_current_user
 from src.application.services.auth_service import AuthService
-from src.application.dtos.user import UserResponse
 from src.presentation.api.response import ok
 
 router = APIRouter(prefix="/auth", tags=["Authentication"])
@@ -22,6 +22,7 @@ async def register(
         {"user": user.model_dump(), "token": token},
         message="Account created successfully",
         request_id=request.state.request_id,
+        status_code=201,
     )
 
 

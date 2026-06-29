@@ -8,7 +8,8 @@ from passlib.context import CryptContext
 from src.application.dtos.auth import LoginRequest, RegisterRequest, TokenPayload
 from src.application.dtos.user import UserResponse
 from src.config import Settings
-from src.domain.entities.profile import Profile, Settings as UserSettings
+from src.domain.entities.profile import Profile
+from src.domain.entities.profile import Settings as UserSettings
 from src.domain.entities.user import User
 from src.domain.exceptions import AuthenticationError, DuplicateEntity
 from src.domain.repositories.profile_repository import (

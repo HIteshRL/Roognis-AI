@@ -2,6 +2,7 @@ from contextlib import asynccontextmanager
 
 import structlog
 from fastapi import FastAPI
+from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import ValidationError
 
@@ -11,6 +12,7 @@ from src.infrastructure.cache.redis_client import close_redis
 from src.infrastructure.logging.setup import configure_logging
 from src.infrastructure.middleware.error_handler import (
     domain_exception_handler,
+    request_validation_exception_handler,
     unhandled_exception_handler,
     validation_exception_handler,
 )
@@ -27,7 +29,9 @@ logger = structlog.get_logger(__name__)
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    logger.info("startup", app=settings.app_name, version=settings.app_version, env=settings.app_env)
+    logger.info(
+        "startup", app=settings.app_name, version=settings.app_version, env=settings.app_env
+    )
     yield
     await close_redis()
     logger.info("shutdown", app=settings.app_name)
@@ -64,6 +68,7 @@ app.add_middleware(
 
 # ── Exception handlers ────────────────────────────────────────────────────────
 app.add_exception_handler(DomainException, domain_exception_handler)  # type: ignore[arg-type]
+app.add_exception_handler(RequestValidationError, request_validation_exception_handler)  # type: ignore[arg-type]
 app.add_exception_handler(ValidationError, validation_exception_handler)  # type: ignore[arg-type]
 app.add_exception_handler(Exception, unhandled_exception_handler)
 

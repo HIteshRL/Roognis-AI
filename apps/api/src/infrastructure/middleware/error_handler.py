@@ -1,5 +1,6 @@
 import structlog
 from fastapi import Request
+from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from pydantic import ValidationError
 
@@ -19,6 +20,27 @@ async def domain_exception_handler(request: Request, exc: DomainException) -> JS
         content={
             "success": False,
             "error": {"code": exc.code, "message": exc.message, "details": exc.details},
+            "request_id": _request_id(request),
+        },
+    )
+
+
+async def request_validation_exception_handler(
+    request: Request, exc: RequestValidationError
+) -> JSONResponse:
+    errors = [
+        {"field": ".".join(str(loc) for loc in e["loc"]), "message": e["msg"]}
+        for e in exc.errors()
+    ]
+    return JSONResponse(
+        status_code=422,
+        content={
+            "success": False,
+            "error": {
+                "code": "VALIDATION_ERROR",
+                "message": "Request validation failed",
+                "details": {"errors": errors},
+            },
             "request_id": _request_id(request),
         },
     )

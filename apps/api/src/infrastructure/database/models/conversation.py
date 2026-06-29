@@ -1,4 +1,6 @@
-from sqlalchemy import Boolean, CheckConstraint, ForeignKey, Integer, String, Text
+from datetime import datetime
+
+from sqlalchemy import Boolean, CheckConstraint, DateTime, ForeignKey, Integer, String, Text, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from src.infrastructure.database.base import Base, TimestampMixin, UUIDMixin
@@ -34,9 +36,6 @@ class MessageModel(Base, UUIDMixin):
     role: Mapped[str] = mapped_column(String(20), nullable=False)
     content: Mapped[str] = mapped_column(Text, nullable=False)
     token_count: Mapped[int | None] = mapped_column(Integer, nullable=True)
-
-    from datetime import datetime
-    from sqlalchemy import DateTime, func
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )

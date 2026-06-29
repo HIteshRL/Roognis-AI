@@ -1,4 +1,3 @@
-from functools import lru_cache
 
 import redis.asyncio as aioredis
 

@@ -1,5 +1,5 @@
-from dataclasses import dataclass, field
-from datetime import datetime
+﻿from dataclasses import dataclass, field
+from datetime import UTC, datetime
 from uuid import UUID, uuid4
 
 
@@ -12,8 +12,8 @@ class Profile:
     bio: str | None = None
     timezone: str = "UTC"
     language: str = "en"
-    created_at: datetime = field(default_factory=datetime.utcnow)
-    updated_at: datetime = field(default_factory=datetime.utcnow)
+    created_at: datetime = field(default_factory=lambda: datetime.now(UTC))
+    updated_at: datetime = field(default_factory=lambda: datetime.now(UTC))
 
     def update(
         self,
@@ -30,7 +30,7 @@ class Profile:
             self.timezone = timezone
         if language is not None:
             self.language = language
-        self.updated_at = datetime.utcnow()
+        self.updated_at = datetime.now(UTC)
 
 
 @dataclass
@@ -41,5 +41,7 @@ class Settings:
     notifications_enabled: bool = True
     llm_model: str = "llama-3.3-70b-versatile"
     temperature: float = 0.7
-    created_at: datetime = field(default_factory=datetime.utcnow)
-    updated_at: datetime = field(default_factory=datetime.utcnow)
+    created_at: datetime = field(default_factory=lambda: datetime.now(UTC))
+    updated_at: datetime = field(default_factory=lambda: datetime.now(UTC))
+
+

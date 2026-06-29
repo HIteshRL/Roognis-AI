@@ -1,18 +1,16 @@
-from fastapi import APIRouter, Request
+import time
+from typing import Annotated
+
+from fastapi import APIRouter, Depends, Request
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
-from typing import Annotated
-from fastapi import Depends
 
 from src.config import get_settings
 from src.infrastructure.cache.redis_client import get_redis
 from src.infrastructure.database.session import get_db
-from src.infrastructure.llm.factory import get_llm_provider
 from src.presentation.api.response import ok
 
 router = APIRouter(tags=["System"])
-
-import time
 
 _start_time = time.time()
 

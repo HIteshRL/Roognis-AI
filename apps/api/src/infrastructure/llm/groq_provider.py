@@ -1,8 +1,8 @@
 from collections.abc import AsyncGenerator
 
 import structlog
-from groq import AsyncGroq
 from groq import APIError as GroqAPIError
+from groq import AsyncGroq
 
 from src.domain.exceptions import LLMError
 from src.infrastructure.llm.base import (

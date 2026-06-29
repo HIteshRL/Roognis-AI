@@ -6,11 +6,10 @@ from sqlalchemy import pool
 from sqlalchemy.engine import Connection
 from sqlalchemy.ext.asyncio import async_engine_from_config
 
-from src.config import get_settings
-from src.infrastructure.database.base import Base
-
 # Import all models so Alembic detects them
 import src.infrastructure.database.models  # noqa: F401
+from src.config import get_settings
+from src.infrastructure.database.base import Base
 
 config = context.config
 settings = get_settings()

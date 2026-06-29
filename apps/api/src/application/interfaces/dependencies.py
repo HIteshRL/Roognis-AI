@@ -3,7 +3,6 @@ FastAPI dependency providers.
 All service construction is here — routes receive fully-constructed services,
 never raw infrastructure objects.
 """
-from collections.abc import AsyncGenerator
 from typing import Annotated
 
 import structlog

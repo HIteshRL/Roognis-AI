@@ -6,7 +6,11 @@ from fastapi.responses import StreamingResponse
 
 from src.application.dtos.chat import SendMessageRequest
 from src.application.dtos.user import UserResponse
-from src.application.interfaces.dependencies import get_chat_service, get_current_user, get_user_service
+from src.application.interfaces.dependencies import (
+    get_chat_service,
+    get_current_user,
+    get_user_service,
+)
 from src.application.services.chat_service import ChatService
 from src.application.services.user_service import UserService
 from src.presentation.api.response import ok, paginated
