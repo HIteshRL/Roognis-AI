@@ -16,6 +16,7 @@ def _to_entity(m: UserModel) -> User:
     u.password_hash = m.password_hash
     u.is_active = m.is_active
     u.is_verified = m.is_verified
+    u.is_admin = m.is_admin
     u.clerk_id = m.clerk_id
     u.created_at = m.created_at
     u.updated_at = m.updated_at

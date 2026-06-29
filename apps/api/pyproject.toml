@@ -4,10 +4,11 @@ build-backend = "hatchling.build"
 
 [project]
 name = "roognis-api"
-version = "0.1.0"
+version = "0.2.0"
 description = "Roognis AI — FastAPI Backend"
 requires-python = ">=3.12"
 dependencies = [
+  # ── Phase 0.1 ────────────────────────────────────────────────────────────────
   "fastapi==0.115.6",
   "uvicorn[standard]==0.32.1",
   "pydantic==2.10.3",
@@ -24,6 +25,20 @@ dependencies = [
   "python-multipart==0.0.20",
   "structlog==24.4.0",
   "python-dotenv==1.0.1",
+  # ── Phase 0.2 — Document Parsing ─────────────────────────────────────────────
+  "pypdf==5.1.0",
+  "python-docx==1.1.2",
+  "python-pptx==1.0.2",
+  "markdown==3.7",
+  "beautifulsoup4==4.12.3",
+  "aiofiles==24.1.0",
+  # ── Phase 0.2 — Chunking ─────────────────────────────────────────────────────
+  "tiktoken==0.8.0",
+  # ── Phase 0.2 — Embeddings ───────────────────────────────────────────────────
+  "fastembed==0.4.1",
+  "openai==1.59.5",
+  # ── Phase 0.2 — Vector Database ──────────────────────────────────────────────
+  "qdrant-client==1.12.1",
 ]
 
 [project.optional-dependencies]
@@ -44,8 +59,8 @@ target-version = "py312"
 [tool.ruff.lint]
 select = ["E", "F", "I", "N", "UP", "B", "SIM"]
 ignore = [
-  "N818",   # DomainException naming — intentional domain pattern
-  "E501",   # Line length — handled per-file where unavoidable (migrations, ORM relationships)
+  "N818",
+  "E501",
 ]
 
 [tool.ruff.lint.per-file-ignores]

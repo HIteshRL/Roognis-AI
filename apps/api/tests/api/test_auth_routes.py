@@ -1,4 +1,4 @@
-import os
+﻿import os
 import pytest
 from datetime import datetime
 from unittest.mock import AsyncMock, patch
@@ -94,4 +94,5 @@ async def test_response_envelope_shape():
     assert "message" in body
     assert "request_id" in body
     assert body["success"] is True
-    assert body["data"]["version"] == "0.1.0"
+    assert body["data"]["version"] == "0.2.0"
+

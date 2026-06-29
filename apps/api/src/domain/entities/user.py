@@ -11,6 +11,7 @@ class User:
     id: UUID = field(default_factory=uuid4)
     is_active: bool = True
     is_verified: bool = False
+    is_admin: bool = False
     clerk_id: str | None = None
     created_at: datetime = field(default_factory=lambda: datetime.now(UTC))
     updated_at: datetime = field(default_factory=lambda: datetime.now(UTC))

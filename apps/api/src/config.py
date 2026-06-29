@@ -15,7 +15,7 @@ class Settings(BaseSettings):
 
     # ── Application ──────────────────────────────────────────────────────────
     app_env: Literal["development", "staging", "production"] = "development"
-    app_version: str = "0.1.0"
+    app_version: str = "0.2.0"
     app_name: str = "Roognis AI API"
 
     # ── Server ───────────────────────────────────────────────────────────────
@@ -49,9 +49,37 @@ class Settings(BaseSettings):
     rate_limit_auth: int = 10
     rate_limit_window_seconds: int = 60
 
-    # ── Logging ───────────────────────────────────────────────────────────────
+    # ── Logging ──────────────────────────────────────────────────────────────
     log_level: str = "INFO"
     log_format: Literal["json", "console"] = "json"
+
+    # ── Phase 0.2: Vector Database ───────────────────────────────────────────
+    vector_provider: Literal["qdrant"] = "qdrant"
+    qdrant_url: str = "http://localhost:6333"
+    qdrant_api_key: str = ""
+    qdrant_collection: str = "roognis_knowledge"
+
+    # ── Phase 0.2: Embeddings ────────────────────────────────────────────────
+    embedding_provider: Literal["fastembed", "openai"] = "fastembed"
+    embedding_model: str = "BAAI/bge-small-en-v1.5"
+    embedding_dimension: int = 384
+    openai_api_key: str = ""
+    openai_embedding_model: str = "text-embedding-3-small"
+
+    # ── Phase 0.2: Chunking ──────────────────────────────────────────────────
+    chunk_size: int = 512
+    chunk_overlap: int = 64
+    chunk_strategy: Literal["fixed", "semantic", "sliding"] = "fixed"
+
+    # ── Phase 0.2: Retrieval ─────────────────────────────────────────────────
+    retrieval_top_k: int = 5
+    retrieval_score_threshold: float = 0.35
+    retrieval_enabled: bool = True
+
+    # ── Phase 0.2: Storage ───────────────────────────────────────────────────
+    storage_provider: Literal["local"] = "local"
+    storage_local_path: str = "./uploads"
+    max_upload_size_mb: int = 50
 
     @property
     def is_production(self) -> bool:
@@ -60,6 +88,10 @@ class Settings(BaseSettings):
     @property
     def database_url_str(self) -> str:
         return str(self.database_url)
+
+    @property
+    def max_upload_size_bytes(self) -> int:
+        return self.max_upload_size_mb * 1024 * 1024
 
 
 @lru_cache

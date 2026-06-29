@@ -1,4 +1,4 @@
-import os
+﻿import os
 import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
 from httpx import AsyncClient, ASGITransport
@@ -15,7 +15,7 @@ configure_logging("INFO", "console")
 
 @pytest.mark.asyncio
 async def test_health_endpoint_degraded_when_db_down():
-    """Health endpoint returns 200 even when DB is down — status field shows 'degraded'."""
+    """Health endpoint returns 200 even when DB is down â€” status field shows 'degraded'."""
     from src.main import app
     from src.infrastructure.database import session as db_session
     from src.infrastructure.cache import redis_client
@@ -61,7 +61,7 @@ async def test_version_endpoint():
     assert response.status_code == 200
     body = response.json()
     assert body["success"] is True
-    assert body["data"]["version"] == "0.1.0"
+    assert body["data"]["version"] == "0.2.0"
     assert body["data"]["env"] == "development"
     assert "request_id" in body
 
@@ -75,3 +75,4 @@ async def test_request_id_header_present():
         response = await client.get("/api/v1/version")
 
     assert "x-request-id" in response.headers
+

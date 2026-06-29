@@ -4,6 +4,7 @@ import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { UserButton } from '@clerk/nextjs'
 import {
+  BookOpen,
   BrainCircuit,
   LayoutDashboard,
   MessageSquare,
@@ -19,6 +20,7 @@ const navItems = [
   { href: '/chat', icon: MessageSquare, label: 'Chat' },
   { href: '/profile', icon: User, label: 'Profile' },
   { href: '/settings', icon: Settings, label: 'Settings' },
+  { href: '/admin', icon: BookOpen, label: 'Admin' },
 ]
 
 export function Sidebar() {

@@ -1,4 +1,10 @@
 from src.infrastructure.database.models.conversation import ConversationModel, MessageModel
+from src.infrastructure.database.models.knowledge import (
+    DocumentChunkModel,
+    DocumentModel,
+    IngestionJobModel,
+    KnowledgeBaseModel,
+)
 from src.infrastructure.database.models.profile import ProfileModel, SettingsModel
 from src.infrastructure.database.models.system import (
     ApiUsageModel,
@@ -20,4 +26,8 @@ __all__ = [
     "SystemLogModel",
     "PromptTemplateModel",
     "ApiUsageModel",
+    "KnowledgeBaseModel",
+    "DocumentModel",
+    "DocumentChunkModel",
+    "IngestionJobModel",
 ]
