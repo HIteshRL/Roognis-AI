@@ -1,0 +1,103 @@
+from abc import ABC, abstractmethod
+from uuid import UUID
+
+from src.domain.entities.learning import (
+    ConceptEdge,
+    ConceptNode,
+    LearningGap,
+    LearningSession,
+    MasteryRecord,
+    StudentProfile,
+)
+
+
+class AbstractStudentProfileRepository(ABC):
+    @abstractmethod
+    async def create(self, profile: StudentProfile) -> StudentProfile: ...
+
+    @abstractmethod
+    async def get_by_user_id(self, user_id: UUID) -> StudentProfile | None: ...
+
+    @abstractmethod
+    async def update(self, profile: StudentProfile) -> StudentProfile: ...
+
+    @abstractmethod
+    async def delete(self, user_id: UUID) -> None: ...
+
+
+class AbstractLearningSessionRepository(ABC):
+    @abstractmethod
+    async def create(self, session: LearningSession) -> LearningSession: ...
+
+    @abstractmethod
+    async def list_by_user(
+        self, user_id: UUID, limit: int, offset: int
+    ) -> list[LearningSession]: ...
+
+    @abstractmethod
+    async def count_by_user(self, user_id: UUID) -> int: ...
+
+    @abstractmethod
+    async def recent_concepts(self, user_id: UUID, days: int) -> list[str]: ...
+
+
+class AbstractConceptNodeRepository(ABC):
+    @abstractmethod
+    async def get_or_create(self, name: str, subject: str | None, grade: str | None, chapter: str | None) -> ConceptNode: ...
+
+    @abstractmethod
+    async def get_by_id(self, concept_id: UUID) -> ConceptNode | None: ...
+
+    @abstractmethod
+    async def get_by_name(self, name: str, subject: str | None = None, grade: str | None = None) -> ConceptNode | None: ...
+
+    @abstractmethod
+    async def list_by_subject_grade(self, subject: str, grade: str) -> list[ConceptNode]: ...
+
+    @abstractmethod
+    async def update(self, node: ConceptNode) -> ConceptNode: ...
+
+
+class AbstractConceptEdgeRepository(ABC):
+    @abstractmethod
+    async def create(self, edge: ConceptEdge) -> ConceptEdge: ...
+
+    @abstractmethod
+    async def get_prerequisites(self, concept_id: UUID) -> list[ConceptNode]: ...
+
+    @abstractmethod
+    async def get_successors(self, concept_id: UUID) -> list[ConceptNode]: ...
+
+    @abstractmethod
+    async def exists(self, source_id: UUID, target_id: UUID) -> bool: ...
+
+
+class AbstractMasteryRepository(ABC):
+    @abstractmethod
+    async def get_or_create(self, user_id: UUID, concept_id: UUID, concept_name: str) -> MasteryRecord: ...
+
+    @abstractmethod
+    async def update(self, record: MasteryRecord) -> MasteryRecord: ...
+
+    @abstractmethod
+    async def list_by_user(self, user_id: UUID) -> list[MasteryRecord]: ...
+
+    @abstractmethod
+    async def get_by_concept(self, user_id: UUID, concept_id: UUID) -> MasteryRecord | None: ...
+
+    @abstractmethod
+    async def average_score(self, user_id: UUID) -> float: ...
+
+
+class AbstractLearningGapRepository(ABC):
+    @abstractmethod
+    async def get_or_create(self, user_id: UUID, concept_id: UUID, concept_name: str, reason: str) -> LearningGap: ...
+
+    @abstractmethod
+    async def update(self, gap: LearningGap) -> LearningGap: ...
+
+    @abstractmethod
+    async def list_by_user(self, user_id: UUID, include_resolved: bool = False) -> list[LearningGap]: ...
+
+    @abstractmethod
+    async def resolve(self, gap_id: UUID) -> None: ...

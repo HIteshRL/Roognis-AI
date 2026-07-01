@@ -12,6 +12,15 @@ from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from src.application.dtos.user import UserResponse
 from src.application.services.auth_service import AuthService
 from src.application.services.chat_service import ChatService
+from src.application.services.concept_extraction_service import ConceptExtractionService
+from src.application.services.knowledge_graph_service import KnowledgeGraphService
+from src.application.services.learning_analytics_service import LearningAnalyticsService
+from src.application.services.learning_gap_detector import LearningGapDetector
+from src.application.services.learning_orchestrator import LearningOrchestrator
+from src.application.services.mastery_engine import MasteryEngine
+from src.application.services.next_best_topic_engine import NextBestTopicEngine
+from src.application.services.session_memory_service import SessionMemoryService
+from src.application.services.student_profile_service import StudentProfileService
 from src.application.services.context_validation_service import ContextValidationService
 from src.application.services.document_service import DocumentService
 from src.application.services.knowledge_library_service import KnowledgeLibraryService
@@ -36,6 +45,14 @@ from src.infrastructure.database.repositories.knowledge_repository import (
 from src.infrastructure.database.repositories.profile_repository import (
     ProfileRepository,
     SettingsRepository,
+)
+from src.infrastructure.database.repositories.learning_repository import (
+    ConceptEdgeRepository,
+    ConceptNodeRepository,
+    LearningGapRepository,
+    LearningSessionRepository,
+    MasteryRepository,
+    StudentProfileRepository,
 )
 from src.infrastructure.database.repositories.user_repository import UserRepository
 from src.infrastructure.database.session import AsyncSession, get_db
@@ -207,4 +224,95 @@ def get_rag_service(
         prompt_assembly_svc=prompt_assembly_svc,
         context_validation_svc=context_validation_svc,
         llm_provider=get_llm_provider(),
+    )
+
+
+# ── Learning Engine ───────────────────────────────────────────────────────────
+
+def get_learning_orchestrator(
+    db: Annotated[AsyncSession, Depends(get_db)],
+    settings: Annotated[Settings, Depends(get_settings)],
+) -> LearningOrchestrator:
+    from groq import AsyncGroq
+
+    node_repo = ConceptNodeRepository(db)
+    edge_repo = ConceptEdgeRepository(db)
+    mastery_repo = MasteryRepository(db)
+    gap_repo = LearningGapRepository(db)
+
+    groq_client = AsyncGroq(api_key=settings.groq_api_key)
+    extractor = ConceptExtractionService(groq_client)
+    profile_svc = StudentProfileService(StudentProfileRepository(db))
+    session_svc = SessionMemoryService(LearningSessionRepository(db))
+    mastery_engine = MasteryEngine(mastery_repo=mastery_repo, concept_repo=node_repo)
+    gap_detector = LearningGapDetector(gap_repo=gap_repo, concept_repo=node_repo)
+
+    return LearningOrchestrator(
+        extractor=extractor,
+        profile_svc=profile_svc,
+        session_svc=session_svc,
+        mastery_engine=mastery_engine,
+        gap_detector=gap_detector,
+    )
+
+
+def get_student_profile_service(
+    db: Annotated[AsyncSession, Depends(get_db)],
+) -> StudentProfileService:
+    return StudentProfileService(StudentProfileRepository(db))
+
+
+def get_session_memory_service(
+    db: Annotated[AsyncSession, Depends(get_db)],
+) -> SessionMemoryService:
+    return SessionMemoryService(LearningSessionRepository(db))
+
+
+def get_mastery_engine(
+    db: Annotated[AsyncSession, Depends(get_db)],
+) -> MasteryEngine:
+    return MasteryEngine(
+        mastery_repo=MasteryRepository(db),
+        concept_repo=ConceptNodeRepository(db),
+    )
+
+
+def get_knowledge_graph_service(
+    db: Annotated[AsyncSession, Depends(get_db)],
+) -> KnowledgeGraphService:
+    return KnowledgeGraphService(
+        node_repo=ConceptNodeRepository(db),
+        edge_repo=ConceptEdgeRepository(db),
+    )
+
+
+def get_learning_gap_detector(
+    db: Annotated[AsyncSession, Depends(get_db)],
+) -> LearningGapDetector:
+    return LearningGapDetector(
+        gap_repo=LearningGapRepository(db),
+        concept_repo=ConceptNodeRepository(db),
+    )
+
+
+def get_next_best_topic_engine(
+    db: Annotated[AsyncSession, Depends(get_db)],
+) -> NextBestTopicEngine:
+    return NextBestTopicEngine(
+        graph=KnowledgeGraphService(
+            node_repo=ConceptNodeRepository(db),
+            edge_repo=ConceptEdgeRepository(db),
+        ),
+        mastery_repo=MasteryRepository(db),
+        profile_repo=StudentProfileRepository(db),
+    )
+
+
+def get_learning_analytics_service(
+    db: Annotated[AsyncSession, Depends(get_db)],
+) -> LearningAnalyticsService:
+    return LearningAnalyticsService(
+        session_repo=LearningSessionRepository(db),
+        mastery_repo=MasteryRepository(db),
+        gap_repo=LearningGapRepository(db),
     )
