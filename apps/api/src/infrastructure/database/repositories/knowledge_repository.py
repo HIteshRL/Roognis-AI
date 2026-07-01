@@ -27,6 +27,9 @@ def _to_kb(m: KnowledgeBaseModel) -> KnowledgeBase:
     kb.description = m.description
     kb.institution = m.institution
     kb.subject = m.subject
+    kb.grade = getattr(m, "grade", None)
+    kb.chapter = getattr(m, "chapter", None)
+    kb.topic = getattr(m, "topic", None)
     kb.language = m.language
     kb.is_active = m.is_active
     kb.created_by = UUID(m.created_by)
@@ -97,6 +100,9 @@ class KnowledgeBaseRepository(AbstractKnowledgeBaseRepository):
             description=kb.description,
             institution=kb.institution,
             subject=kb.subject,
+            grade=kb.grade,
+            chapter=kb.chapter,
+            topic=kb.topic,
             language=kb.language,
             is_active=kb.is_active,
             created_by=str(kb.created_by),
@@ -133,6 +139,9 @@ class KnowledgeBaseRepository(AbstractKnowledgeBaseRepository):
         model.description = kb.description
         model.institution = kb.institution
         model.subject = kb.subject
+        model.grade = kb.grade
+        model.chapter = kb.chapter
+        model.topic = kb.topic
         model.language = kb.language
         model.is_active = kb.is_active
         await self._db.flush()

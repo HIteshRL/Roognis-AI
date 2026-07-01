@@ -1,7 +1,8 @@
 {
   "permissions": {
     "allow": [
-      "mcp__visualize__read_me"
+      "mcp__visualize__read_me",
+      "mcp__Claude_Preview__preview_start"
     ]
   }
 }

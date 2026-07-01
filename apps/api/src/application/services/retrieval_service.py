@@ -1,3 +1,5 @@
+import time
+
 import structlog
 
 from src.application.dtos.knowledge import RetrievedContext, SearchResultItem
@@ -10,6 +12,7 @@ logger = structlog.get_logger(__name__)
 class RetrievalService:
     """
     Converts a user query into a ranked list of relevant document chunks.
+    Supports strict curriculum filtering: institution / grade / subject / chapter / topic.
     Never touches LLM — pure similarity search + ranking.
     """
 
@@ -29,24 +32,38 @@ class RetrievalService:
         self,
         query: str,
         knowledge_base_id: str | None = None,
+        curriculum_filter: dict[str, str] | None = None,
         top_k: int | None = None,
         score_threshold: float | None = None,
-    ) -> RetrievedContext:
+    ) -> tuple[RetrievedContext, dict[str, float]]:
+        """
+        Returns (RetrievedContext, timing) where timing has keys:
+          embedding_ms, retrieval_ms
+        """
         k = top_k or self._top_k
         threshold = score_threshold or self._threshold
 
+        # ── Embed query ───────────────────────────────────────────────────────
+        t0 = time.monotonic()
         query_vector = await self._embedder.embed_query(query)
+        embedding_ms = (time.monotonic() - t0) * 1000
 
-        filter_payload = {}
+        # ── Build filter ──────────────────────────────────────────────────────
+        filter_payload: dict[str, str] = {}
         if knowledge_base_id:
             filter_payload["knowledge_base_id"] = knowledge_base_id
+        if curriculum_filter:
+            filter_payload.update(curriculum_filter)
 
+        # ── Vector search ─────────────────────────────────────────────────────
+        t1 = time.monotonic()
         results = await self._store.search(
             query_vector=query_vector,
             top_k=k,
             score_threshold=threshold,
             filter_payload=filter_payload or None,
         )
+        retrieval_ms = (time.monotonic() - t1) * 1000
 
         items = [
             SearchResultItem(
@@ -57,15 +74,15 @@ class RetrievalService:
                 score=r.score,
                 page_number=r.payload.get("page_number"),
                 metadata={
-                    k: v
-                    for k, v in r.payload.items()
-                    if k not in {"content", "document_id", "document_title", "knowledge_base_id"}
+                    fk: fv
+                    for fk, fv in r.payload.items()
+                    if fk not in {"content", "document_id", "document_title", "knowledge_base_id"}
                 },
             )
             for r in results
         ]
 
-        # Deduplicate by document — keep highest-scoring chunk per document first
+        # Keep highest-scoring chunk per document, but allow up to 2 per doc
         seen_docs: set[str] = set()
         deduped: list[SearchResultItem] = []
         for item in sorted(items, key=lambda x: x.score, reverse=True):
@@ -78,11 +95,17 @@ class RetrievalService:
             query_len=len(query),
             raw_results=len(results),
             deduped_results=len(deduped),
+            curriculum_filter=filter_payload,
+            embedding_ms=round(embedding_ms, 1),
+            retrieval_ms=round(retrieval_ms, 1),
+            scores=[round(r.score, 3) for r in deduped],
             has_context=bool(deduped),
         )
 
-        return RetrievedContext(
+        context = RetrievedContext(
             chunks=deduped,
             has_context=bool(deduped),
             query=query,
         )
+        timing = {"embedding_ms": embedding_ms, "retrieval_ms": retrieval_ms}
+        return context, timing

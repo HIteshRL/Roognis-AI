@@ -11,6 +11,9 @@ class KnowledgeBase:
     description: str | None = None
     institution: str | None = None
     subject: str | None = None
+    grade: str | None = None      # e.g. "7", "Grade 7", "Year 1"
+    chapter: str | None = None    # e.g. "Nutrition in Plants"
+    topic: str | None = None      # e.g. "Photosynthesis"
     language: str = "en"
     is_active: bool = True
     created_at: datetime = field(default_factory=lambda: datetime.now(UTC))

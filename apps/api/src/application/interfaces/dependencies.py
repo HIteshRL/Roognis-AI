@@ -16,6 +16,7 @@ from src.application.services.context_validation_service import ContextValidatio
 from src.application.services.document_service import DocumentService
 from src.application.services.knowledge_library_service import KnowledgeLibraryService
 from src.application.services.prompt_assembly_service import PromptAssemblyService
+from src.application.services.rag_service import RagService
 from src.application.services.retrieval_service import RetrievalService
 from src.application.services.search_service import SearchService
 from src.application.services.user_service import UserService
@@ -184,3 +185,26 @@ def get_search_service(
     )
     validation_svc = ContextValidationService(settings.retrieval_score_threshold)
     return SearchService(retrieval_svc=retrieval_svc, validation_svc=validation_svc)
+
+
+def get_rag_service(
+    db: Annotated[AsyncSession, Depends(get_db)],
+    settings: Annotated[Settings, Depends(get_settings)],
+) -> RagService:
+    vector_store = get_vector_store()
+    embedding_provider = get_embedding_provider()
+    retrieval_svc = RetrievalService(
+        vector_store=vector_store,
+        embedding_provider=embedding_provider,
+        top_k=settings.retrieval_top_k,
+        score_threshold=settings.retrieval_score_threshold,
+    )
+    prompt_loader = PromptLoader(db)
+    prompt_assembly_svc = PromptAssemblyService(prompt_loader)
+    context_validation_svc = ContextValidationService(settings.retrieval_score_threshold)
+    return RagService(
+        retrieval_svc=retrieval_svc,
+        prompt_assembly_svc=prompt_assembly_svc,
+        context_validation_svc=context_validation_svc,
+        llm_provider=get_llm_provider(),
+    )

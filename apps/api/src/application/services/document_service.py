@@ -51,6 +51,8 @@ class DocumentService:
         filename: str,
         file_bytes: bytes,
         content_type: str,
+        title: str | None = None,
+        description: str | None = None,
     ) -> tuple[Document, IngestionJob]:
         ext = os.path.splitext(filename)[1].lower()
         if ext not in SUPPORTED_EXTENSIONS:
@@ -72,7 +74,8 @@ class DocumentService:
             filename=filename,
             file_type=content_type or ext,
             file_size=len(file_bytes),
-            title=os.path.splitext(filename)[0],
+            title=title or os.path.splitext(filename)[0],
+            description=description,
         )
         doc = await self._docs.create(doc)
 

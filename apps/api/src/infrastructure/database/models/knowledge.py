@@ -14,6 +14,9 @@ class KnowledgeBaseModel(Base, UUIDMixin, TimestampMixin):
     description: Mapped[str | None] = mapped_column(Text, nullable=True)
     institution: Mapped[str | None] = mapped_column(String(200), nullable=True)
     subject: Mapped[str | None] = mapped_column(String(200), nullable=True)
+    grade: Mapped[str | None] = mapped_column(String(100), nullable=True, index=True)
+    chapter: Mapped[str | None] = mapped_column(String(200), nullable=True)
+    topic: Mapped[str | None] = mapped_column(String(200), nullable=True)
     language: Mapped[str] = mapped_column(String(10), default="en", nullable=False)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
     created_by: Mapped[str] = mapped_column(

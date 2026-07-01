@@ -53,16 +53,18 @@ def svc(mock_vector_store, mock_embedder):
 
 @pytest.mark.asyncio
 async def test_retrieve_returns_context_with_results(svc, mock_vector_store):
-    ctx = await svc.retrieve("What is binary search?")
+    ctx, timing = await svc.retrieve("What is binary search?")
     assert ctx.has_context is True
     assert len(ctx.chunks) == 2
     assert ctx.query == "What is binary search?"
+    assert "embedding_ms" in timing
+    assert "retrieval_ms" in timing
 
 
 @pytest.mark.asyncio
 async def test_retrieve_empty_when_no_results(svc, mock_vector_store):
     mock_vector_store.search.return_value = []
-    ctx = await svc.retrieve("random unrelated question")
+    ctx, _ = await svc.retrieve("random unrelated question")
     assert ctx.has_context is False
     assert ctx.chunks == []
 
@@ -76,13 +78,13 @@ async def test_retrieve_passes_kb_filter(svc, mock_vector_store):
 
 @pytest.mark.asyncio
 async def test_retrieve_chunks_sorted_by_score(svc):
-    ctx = await svc.retrieve("sort test")
+    ctx, _ = await svc.retrieve("sort test")
     scores = [c.score for c in ctx.chunks]
     assert scores == sorted(scores, reverse=True)
 
 
 @pytest.mark.asyncio
 async def test_formatted_context_contains_source_prefix(svc):
-    ctx = await svc.retrieve("format test")
+    ctx, _ = await svc.retrieve("format test")
     assert "[Source 1:" in ctx.formatted_context
     assert "Binary search" in ctx.formatted_context

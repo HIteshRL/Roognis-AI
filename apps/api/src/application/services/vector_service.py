@@ -30,9 +30,16 @@ class VectorService:
             self._collection_ready = True
 
     async def index_chunks(
-        self, chunks: list[DocumentChunk], document_title: str | None = None
+        self,
+        chunks: list[DocumentChunk],
+        document_title: str | None = None,
+        academic_meta: dict | None = None,
     ) -> list[DocumentChunk]:
-        """Embed and index chunks. Returns chunks with vector_id populated."""
+        """Embed and index chunks. Returns chunks with vector_id populated.
+
+        academic_meta keys: institution, grade, subject, chapter, topic
+        — stored in Qdrant payload so curriculum filtering works at query time.
+        """
         await self._ensure_collection()
 
         indexed: list[DocumentChunk] = []
@@ -54,6 +61,7 @@ class VectorService:
                         "chunk_index": chunk.chunk_index,
                         "page_number": chunk.page_number,
                         "token_count": chunk.token_count,
+                        **(academic_meta or {}),
                         **chunk.metadata,
                     },
                 )

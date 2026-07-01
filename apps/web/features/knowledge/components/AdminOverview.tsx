@@ -1,7 +1,7 @@
 'use client'
 
 import Link from 'next/link'
-import { BookOpen, Database, FileText, Search, Upload } from 'lucide-react'
+import { BookOpen, Database, FlaskConical, Search, Upload } from 'lucide-react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 
@@ -33,6 +33,13 @@ const cards = [
     description: 'Inspect the Qdrant collection and indexed vectors.',
     href: '/admin/vector',
     cta: 'View stats',
+  },
+  {
+    icon: FlaskConical,
+    title: 'RAG Console',
+    description: 'Test curriculum-filtered retrieval with live observability.',
+    href: '/admin/rag',
+    cta: 'Open console',
   },
 ]
 

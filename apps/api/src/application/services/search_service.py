@@ -19,7 +19,7 @@ class SearchService:
         self._validation = validation_svc
 
     async def search(self, request: SearchRequest) -> SearchResponse:
-        context = await self._retrieval.retrieve(
+        context, _timing = await self._retrieval.retrieve(
             query=request.query,
             knowledge_base_id=request.knowledge_base_id,
             top_k=request.top_k,

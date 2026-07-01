@@ -22,6 +22,7 @@ from src.infrastructure.database.repositories.knowledge_repository import (
     ChunkRepository,
     DocumentRepository,
     IngestionJobRepository,
+    KnowledgeBaseRepository,
 )
 from src.infrastructure.database.session import AsyncSessionLocal
 from src.infrastructure.embeddings.base import AbstractEmbeddingProvider
@@ -55,6 +56,7 @@ class IngestionPipeline:
             doc_repo = DocumentRepository(db)
             chunk_repo = ChunkRepository(db)
             job_repo = IngestionJobRepository(db)
+            kb_repo = KnowledgeBaseRepository(db)
 
             job = await job_repo.get_by_document_id(document_id)
             if not job:
@@ -65,6 +67,15 @@ class IngestionPipeline:
             if not doc:
                 logger.error("ingestion_document_not_found", document_id=str(document_id))
                 return
+
+            # Fetch KB to propagate academic metadata into vector payloads
+            kb = await kb_repo.get_by_id(doc.knowledge_base_id)
+            academic_meta: dict = {}
+            if kb:
+                for field in ("institution", "grade", "subject", "chapter", "topic"):
+                    val = getattr(kb, field, None)
+                    if val:
+                        academic_meta[field] = val
 
             try:
                 # Step 1 — Parsing
@@ -108,7 +119,9 @@ class IngestionPipeline:
                 await db.commit()
 
                 indexed_chunks = await self._vector_svc.index_chunks(
-                    domain_chunks, document_title=doc.title or doc.filename
+                    domain_chunks,
+                    document_title=doc.title or doc.filename,
+                    academic_meta=academic_meta,
                 )
 
                 # Step 5 — Persist chunks to PostgreSQL

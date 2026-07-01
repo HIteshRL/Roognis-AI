@@ -76,7 +76,7 @@ class ChatService:
 
         # ── RAG: retrieve context, build grounded prompt ──────────────────────
         if self._retrieval_enabled and self._retrieval and self._prompt_assembly:
-            raw_context = await self._retrieval.retrieve(dto.message)
+            raw_context, _timing = await self._retrieval.retrieve(dto.message)
             if self._context_validation:
                 context = self._context_validation.validate(raw_context)
             else:
