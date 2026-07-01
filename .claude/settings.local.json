@@ -2,7 +2,22 @@
   "permissions": {
     "allow": [
       "mcp__visualize__read_me",
-      "mcp__Claude_Preview__preview_start"
+      "mcp__Claude_Preview__preview_start",
+      "Bash(pip install *)",
+      "Bash(python -m pytest tests/services/test_curriculum_retrieval.py -v --tb=short)",
+      "Bash(python -m pytest tests/api/test_rag_routes.py -v --tb=short)",
+      "Bash(python -m pytest tests/api/test_rag_routes.py tests/services/test_curriculum_retrieval.py -v --tb=short)",
+      "Bash(python -m pytest -v --tb=short)",
+      "Bash(python -m pytest tests/unit/services/test_retrieval_service.py -v --tb=short)",
+      "Bash(python -m pytest tests/unit/services/test_auth_service.py -v --tb=short)",
+      "Bash(python -m pytest -v --tb=no)",
+      "Bash(Start-Sleep -Seconds 5)",
+      "Bash(Invoke-WebRequest -Uri \"http://localhost:3000/admin/rag\" -UseBasicParsing -TimeoutSec 10)",
+      "Bash(Select-Object -ExpandProperty StatusCode)",
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\" http://localhost:3000/)",
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\" http://localhost:3000/admin/rag)",
+      "Bash(git add *)",
+      "Bash(git commit -m ' *)"
     ]
   }
 }
