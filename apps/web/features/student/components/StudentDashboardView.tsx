@@ -2,7 +2,7 @@
 
 import { useQuery } from '@tanstack/react-query'
 import { studentApi } from '@/lib/api/student'
-import { Brain, BookOpen, AlertTriangle, TrendingUp, Zap, Target } from 'lucide-react'
+import { Brain, BookOpen, AlertTriangle, TrendingUp, Zap, Target, Activity, Flame } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Progress } from '@/components/ui/progress'
@@ -91,6 +91,61 @@ export function StudentDashboardView() {
           </div>
         </CardContent>
       </Card>
+
+      {/* Learner Intelligence card */}
+      {profile?.behavioral_signals && profile.behavioral_signals.total_sessions >= 3 && (
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-base flex items-center gap-2">
+              <Activity className="h-4 w-4 text-violet-500" />
+              Learner Intelligence
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-2 gap-x-6 gap-y-2 text-sm sm:grid-cols-4">
+              {profile.behavioral_signals.preferred_bloom_level && (
+                <div>
+                  <p className="text-xs text-muted-foreground">Operates at</p>
+                  <p className="font-medium">{profile.behavioral_signals.preferred_bloom_level}</p>
+                </div>
+              )}
+              {profile.behavioral_signals.struggle_bloom_level && (
+                <div>
+                  <p className="text-xs text-muted-foreground">Struggles at</p>
+                  <p className="font-medium text-orange-600">{profile.behavioral_signals.struggle_bloom_level}</p>
+                </div>
+              )}
+              <div>
+                <p className="text-xs text-muted-foreground">Learning style</p>
+                <p className="font-medium capitalize">{profile.behavioral_signals.response_pattern}</p>
+              </div>
+              <div>
+                <p className="text-xs text-muted-foreground">Complexity</p>
+                <p className="font-medium capitalize">{profile.behavioral_signals.question_complexity_trend}</p>
+              </div>
+              {profile.behavioral_signals.engagement_streak > 0 && (
+                <div className="flex items-center gap-1.5">
+                  <Flame className="h-3.5 w-3.5 text-orange-500" />
+                  <div>
+                    <p className="text-xs text-muted-foreground">Streak</p>
+                    <p className="font-medium">{profile.behavioral_signals.engagement_streak} days</p>
+                  </div>
+                </div>
+              )}
+              <div>
+                <p className="text-xs text-muted-foreground">Frequency</p>
+                <p className="font-medium">{profile.behavioral_signals.sessions_per_day.toFixed(1)}/day</p>
+              </div>
+              {profile.behavioral_signals.strengths.length > 0 && (
+                <div className="col-span-2">
+                  <p className="text-xs text-muted-foreground">Strengths</p>
+                  <p className="font-medium truncate">{profile.behavioral_signals.strengths.slice(0, 3).join(', ')}</p>
+                </div>
+              )}
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
         {/* Recent concepts */}

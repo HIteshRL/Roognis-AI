@@ -3,7 +3,6 @@ from uuid import UUID
 
 from pydantic import BaseModel, Field
 
-
 # ── Inbound ───────────────────────────────────────────────────────────────────
 
 class UpdateProfileRequest(BaseModel):
@@ -15,6 +14,21 @@ class UpdateProfileRequest(BaseModel):
 
 # ── Outbound ──────────────────────────────────────────────────────────────────
 
+class BehavioralSignalsResponse(BaseModel):
+    preferred_bloom_level: str | None = None
+    struggle_bloom_level: str | None = None
+    avg_session_duration_ms: int = 0
+    sessions_per_day: float = 0.0
+    question_complexity_trend: str = "stable"
+    dominant_subject: str | None = None
+    total_sessions: int = 0
+    total_misconceptions: int = 0
+    engagement_streak: int = 0
+    strengths: list[str] = Field(default_factory=list)
+    recent_topics: list[str] = Field(default_factory=list)
+    response_pattern: str = "unknown"
+
+
 class StudentProfileResponse(BaseModel):
     id: UUID
     user_id: UUID
@@ -24,6 +38,7 @@ class StudentProfileResponse(BaseModel):
     current_chapter: str | None
     learning_velocity: float
     confidence_score: float
+    behavioral_signals: BehavioralSignalsResponse = Field(default_factory=BehavioralSignalsResponse)
     last_active: datetime
     created_at: datetime
     updated_at: datetime
@@ -89,6 +104,14 @@ class RecommendationResponse(BaseModel):
     readiness_score: float     # 0–1, how ready the student is
 
 
+class RetentionRiskResponse(BaseModel):
+    concept_id: UUID
+    concept_name: str
+    score: float
+    days_since_reinforced: int
+    risk: float          # 0-1, higher = more likely to have decayed
+
+
 class LearningAnalyticsResponse(BaseModel):
     user_id: UUID
     total_sessions: int
@@ -102,6 +125,8 @@ class LearningAnalyticsResponse(BaseModel):
     critical_gaps: int
     recent_bloom_levels: dict[str, int]   # bloom_level -> count last 7 days
     recent_concepts: list[str]
+    velocity_trend: float = 0.0                              # points/day over last 7 days
+    at_risk_concepts: list[RetentionRiskResponse] = Field(default_factory=list)
 
 
 class SessionListResponse(BaseModel):

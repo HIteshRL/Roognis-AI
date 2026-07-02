@@ -2,7 +2,7 @@ from uuid import UUID
 
 import structlog
 
-from src.domain.entities.learning import StudentProfile
+from src.domain.entities.learning import BehavioralSignals, StudentProfile
 from src.domain.repositories.learning_repository import AbstractStudentProfileRepository
 
 logger = structlog.get_logger(__name__)
@@ -54,4 +54,16 @@ class StudentProfileService:
         profile = await self._repo.get_by_user_id(user_id)
         if profile:
             profile.update_confidence(avg_mastery)
+            await self._repo.update(profile)
+
+    async def update_velocity(self, user_id: UUID, velocity: float) -> None:
+        profile = await self._repo.get_by_user_id(user_id)
+        if profile:
+            profile.learning_velocity = velocity
+            await self._repo.update(profile)
+
+    async def update_behavioral_signals(self, user_id: UUID, signals: BehavioralSignals) -> None:
+        profile = await self._repo.get_by_user_id(user_id)
+        if profile:
+            profile.behavioral_signals = signals
             await self._repo.update(profile)

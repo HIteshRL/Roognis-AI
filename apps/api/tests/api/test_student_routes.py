@@ -18,7 +18,7 @@ def _mock_user():
 
 
 def _make_profile(user_id):
-    from src.domain.entities.learning import StudentProfile
+    from src.domain.entities.learning import BehavioralSignals, StudentProfile
     from datetime import datetime, UTC
     p = StudentProfile.__new__(StudentProfile)
     p.id = uuid4()
@@ -29,6 +29,7 @@ def _make_profile(user_id):
     p.current_chapter = "Chapter 1"
     p.learning_velocity = 0.5
     p.confidence_score = 0.6
+    p.behavioral_signals = BehavioralSignals()
     p.last_active = datetime.now(UTC)
     p.created_at = datetime.now(UTC)
     p.updated_at = datetime.now(UTC)

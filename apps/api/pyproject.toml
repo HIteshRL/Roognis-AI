@@ -39,6 +39,8 @@ dependencies = [
   "openai==1.59.5",
   # ── Phase 0.2 — Vector Database ──────────────────────────────────────────────
   "qdrant-client==1.12.1",
+  # ── Phase 0.0 — Observability ────────────────────────────────────────────────
+  "prometheus-fastapi-instrumentator==7.0.0",
 ]
 
 [project.optional-dependencies]

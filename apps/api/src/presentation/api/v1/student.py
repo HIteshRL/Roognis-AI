@@ -4,6 +4,7 @@ from uuid import UUID
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query, Request, status
 
 from src.application.dtos.learning import (
+    BehavioralSignalsResponse,
     LearningAnalyticsResponse,
     MasteryRecordResponse,
     RecommendationResponse,
@@ -32,6 +33,37 @@ from src.presentation.api.response import ok, paginated
 router = APIRouter(prefix="/student", tags=["Learning Engine"])
 
 
+def _profile_to_dict(profile) -> dict:
+    bs = profile.behavioral_signals
+    return StudentProfileResponse(
+        id=profile.id,
+        user_id=profile.user_id,
+        institution=profile.institution,
+        grade=profile.grade,
+        subjects=profile.subjects,
+        current_chapter=profile.current_chapter,
+        learning_velocity=profile.learning_velocity,
+        confidence_score=profile.confidence_score,
+        behavioral_signals=BehavioralSignalsResponse(
+            preferred_bloom_level=bs.preferred_bloom_level,
+            struggle_bloom_level=bs.struggle_bloom_level,
+            avg_session_duration_ms=bs.avg_session_duration_ms,
+            sessions_per_day=bs.sessions_per_day,
+            question_complexity_trend=bs.question_complexity_trend,
+            dominant_subject=bs.dominant_subject,
+            total_sessions=bs.total_sessions,
+            total_misconceptions=bs.total_misconceptions,
+            engagement_streak=bs.engagement_streak,
+            strengths=bs.strengths,
+            recent_topics=bs.recent_topics,
+            response_pattern=bs.response_pattern,
+        ),
+        last_active=profile.last_active,
+        created_at=profile.created_at,
+        updated_at=profile.updated_at,
+    ).model_dump(mode="json")
+
+
 @router.get("/profile", response_model=None)
 async def get_profile(
     request: Request,
@@ -39,22 +71,7 @@ async def get_profile(
     profile_svc: Annotated[StudentProfileService, Depends(get_student_profile_service)],
 ):
     profile = await profile_svc.get_or_create(UUID(current_user.id))
-    return ok(
-        StudentProfileResponse(
-            id=profile.id,
-            user_id=profile.user_id,
-            institution=profile.institution,
-            grade=profile.grade,
-            subjects=profile.subjects,
-            current_chapter=profile.current_chapter,
-            learning_velocity=profile.learning_velocity,
-            confidence_score=profile.confidence_score,
-            last_active=profile.last_active,
-            created_at=profile.created_at,
-            updated_at=profile.updated_at,
-        ).model_dump(),
-        request_id=request.state.request_id,
-    )
+    return ok(_profile_to_dict(profile), request_id=request.state.request_id)
 
 
 @router.post("/profile", response_model=None)
@@ -71,22 +88,7 @@ async def update_profile(
         subjects=body.subjects or None,
         current_chapter=body.current_chapter,
     )
-    return ok(
-        StudentProfileResponse(
-            id=profile.id,
-            user_id=profile.user_id,
-            institution=profile.institution,
-            grade=profile.grade,
-            subjects=profile.subjects,
-            current_chapter=profile.current_chapter,
-            learning_velocity=profile.learning_velocity,
-            confidence_score=profile.confidence_score,
-            last_active=profile.last_active,
-            created_at=profile.created_at,
-            updated_at=profile.updated_at,
-        ).model_dump(),
-        request_id=request.state.request_id,
-    )
+    return ok(_profile_to_dict(profile), request_id=request.state.request_id)
 
 
 @router.get("/sessions", response_model=None)
@@ -146,7 +148,7 @@ async def get_mastery(
                 label=r.label,
                 interaction_count=r.interaction_count,
                 last_updated=r.last_updated,
-            ).model_dump()
+            ).model_dump(mode="json")
             for r in records
         ],
         request_id=request.state.request_id,
@@ -210,7 +212,7 @@ async def get_recommendations(
                 chapter=r.chapter,
                 reason=r.reason,
                 readiness_score=r.readiness_score,
-            ).model_dump()
+            ).model_dump(mode="json")
             for r in recs
         ],
         request_id=request.state.request_id,
@@ -238,6 +240,17 @@ async def get_analytics(
             "critical_gaps": analytics.critical_gaps,
             "recent_bloom_levels": analytics.recent_bloom_levels,
             "recent_concepts": analytics.recent_concepts,
+            "velocity_trend": analytics.velocity_trend,
+            "at_risk_concepts": [
+                {
+                    "concept_id": str(r.concept_id),
+                    "concept_name": r.concept_name,
+                    "score": r.score,
+                    "days_since_reinforced": r.days_since_reinforced,
+                    "risk": r.risk,
+                }
+                for r in analytics.at_risk_concepts
+            ],
         },
         request_id=request.state.request_id,
     )

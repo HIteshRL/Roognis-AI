@@ -10,6 +10,7 @@ from src.application.dtos.chat import (
     SendMessageRequest,
 )
 from src.application.services.context_validation_service import ContextValidationService
+from src.application.services.learner_context_service import LearnerContextService
 from src.application.services.prompt_assembly_service import PromptAssemblyService
 from src.application.services.retrieval_service import RetrievalService
 from src.domain.entities.conversation import Conversation, Message
@@ -37,6 +38,7 @@ class ChatService:
         prompt_assembly_svc: PromptAssemblyService | None = None,
         context_validation_svc: ContextValidationService | None = None,
         retrieval_enabled: bool = True,
+        learner_context_svc: LearnerContextService | None = None,
     ) -> None:
         self._conversations = conversation_repo
         self._messages = message_repo
@@ -46,6 +48,7 @@ class ChatService:
         self._prompt_assembly = prompt_assembly_svc
         self._context_validation = context_validation_svc
         self._retrieval_enabled = retrieval_enabled
+        self._learner_context = learner_context_svc
 
     async def stream_response(
         self,
@@ -74,6 +77,14 @@ class ChatService:
             LLMMessage(role=m.role, content=m.content) for m in history[:-1]
         ]
 
+        # ── Phase 0.3: condition every response on the learner's profile ──────
+        learner_context: str | None = None
+        if self._learner_context:
+            try:
+                learner_context = await self._learner_context.build(user_id)
+            except Exception as exc:
+                logger.warning("learner_context_build_failed", error=str(exc), user_id=str(user_id))
+
         # ── RAG: retrieve context, build grounded prompt ──────────────────────
         if self._retrieval_enabled and self._retrieval and self._prompt_assembly:
             raw_context, _timing = await self._retrieval.retrieve(dto.message)
@@ -86,6 +97,7 @@ class ChatService:
                 user_message=dto.message,
                 history=history_msgs,
                 context=context,
+                learner_context=learner_context,
             )
 
             sources_meta = {
@@ -99,6 +111,8 @@ class ChatService:
         else:
             # Phase 0.1 fallback — plain LLM without RAG
             system_prompt = await self._prompts.get("default_system")
+            if learner_context:
+                system_prompt = f"{system_prompt}\n\n{learner_context}"
             llm_messages = [LLMMessage(role="system", content=system_prompt)]
             llm_messages.extend(history_msgs)
             llm_messages.append(LLMMessage(role="user", content=dto.message))

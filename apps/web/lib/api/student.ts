@@ -1,5 +1,20 @@
 import { apiClient } from './client'
 
+export interface BehavioralSignals {
+  preferred_bloom_level: string | null
+  struggle_bloom_level: string | null
+  avg_session_duration_ms: number
+  sessions_per_day: number
+  question_complexity_trend: 'rising' | 'stable' | 'declining'
+  dominant_subject: string | null
+  total_sessions: number
+  total_misconceptions: number
+  engagement_streak: number
+  strengths: string[]
+  recent_topics: string[]
+  response_pattern: 'procedural' | 'conceptual' | 'mixed' | 'unknown'
+}
+
 export interface StudentProfile {
   id: string
   user_id: string
@@ -9,6 +24,7 @@ export interface StudentProfile {
   current_chapter: string | null
   learning_velocity: number
   confidence_score: number
+  behavioral_signals: BehavioralSignals
   last_active: string
   created_at: string
   updated_at: string
@@ -84,6 +100,16 @@ export interface LearningAnalytics {
   critical_gaps: number
   recent_bloom_levels: Record<string, number>
   recent_concepts: string[]
+  velocity_trend: number
+  at_risk_concepts: RetentionRisk[]
+}
+
+export interface RetentionRisk {
+  concept_id: string
+  concept_name: string
+  score: number
+  days_since_reinforced: number
+  risk: number
 }
 
 export interface SessionsPage {

@@ -1,5 +1,6 @@
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
+from typing import Any
 from uuid import UUID, uuid4
 
 # Bloom's taxonomy levels in ascending cognitive order
@@ -17,6 +18,62 @@ BLOOM_GAINS = {
 
 
 @dataclass
+class BehavioralSignals:
+    """Computed behavioral intelligence derived from session history.
+    Stored as JSONB on student_profiles — the 'real-time state' store."""
+    preferred_bloom_level: str | None = None
+    struggle_bloom_level: str | None = None
+    avg_session_duration_ms: int = 0
+    sessions_per_day: float = 0.0
+    question_complexity_trend: str = "stable"
+    dominant_subject: str | None = None
+    total_sessions: int = 0
+    total_misconceptions: int = 0
+    engagement_streak: int = 0
+    strengths: list[str] = field(default_factory=list)
+    recent_topics: list[str] = field(default_factory=list)
+    response_pattern: str = "unknown"
+    last_computed: str | None = None
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "preferred_bloom_level": self.preferred_bloom_level,
+            "struggle_bloom_level": self.struggle_bloom_level,
+            "avg_session_duration_ms": self.avg_session_duration_ms,
+            "sessions_per_day": self.sessions_per_day,
+            "question_complexity_trend": self.question_complexity_trend,
+            "dominant_subject": self.dominant_subject,
+            "total_sessions": self.total_sessions,
+            "total_misconceptions": self.total_misconceptions,
+            "engagement_streak": self.engagement_streak,
+            "strengths": self.strengths,
+            "recent_topics": self.recent_topics,
+            "response_pattern": self.response_pattern,
+            "last_computed": self.last_computed,
+        }
+
+    @classmethod
+    def from_dict(cls, data: dict[str, Any] | None) -> "BehavioralSignals":
+        if not data:
+            return cls()
+        return cls(
+            preferred_bloom_level=data.get("preferred_bloom_level"),
+            struggle_bloom_level=data.get("struggle_bloom_level"),
+            avg_session_duration_ms=data.get("avg_session_duration_ms", 0),
+            sessions_per_day=data.get("sessions_per_day", 0.0),
+            question_complexity_trend=data.get("question_complexity_trend", "stable"),
+            dominant_subject=data.get("dominant_subject"),
+            total_sessions=data.get("total_sessions", 0),
+            total_misconceptions=data.get("total_misconceptions", 0),
+            engagement_streak=data.get("engagement_streak", 0),
+            strengths=data.get("strengths", []),
+            recent_topics=data.get("recent_topics", []),
+            response_pattern=data.get("response_pattern", "unknown"),
+            last_computed=data.get("last_computed"),
+        )
+
+
+@dataclass
 class StudentProfile:
     user_id: UUID
     id: UUID = field(default_factory=uuid4)
@@ -26,6 +83,7 @@ class StudentProfile:
     current_chapter: str | None = None
     learning_velocity: float = 0.0   # avg mastery-points gained per day
     confidence_score: float = 0.0    # 0–1, derived from recent mastery
+    behavioral_signals: BehavioralSignals = field(default_factory=BehavioralSignals)
     last_active: datetime = field(default_factory=lambda: datetime.now(UTC))
     created_at: datetime = field(default_factory=lambda: datetime.now(UTC))
     updated_at: datetime = field(default_factory=lambda: datetime.now(UTC))

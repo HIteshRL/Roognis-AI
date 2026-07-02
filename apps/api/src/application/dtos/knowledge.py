@@ -212,6 +212,7 @@ class RagObservability(BaseModel):
     chunks_used: int
     similarity_scores: list[float]
     token_usage: dict[str, int]
+    cache_hit: bool = False
 
 
 class RagQueryResponse(BaseModel):

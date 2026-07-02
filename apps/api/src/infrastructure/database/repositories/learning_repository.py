@@ -5,6 +5,7 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.domain.entities.learning import (
+    BehavioralSignals,
     ConceptEdge,
     ConceptNode,
     LearningGap,
@@ -29,7 +30,6 @@ from src.infrastructure.database.models.learning import (
     StudentProfileModel,
 )
 
-
 # ── Mappers ───────────────────────────────────────────────────────────────────
 
 def _to_profile(m: StudentProfileModel) -> StudentProfile:
@@ -42,6 +42,7 @@ def _to_profile(m: StudentProfileModel) -> StudentProfile:
     p.current_chapter = m.current_chapter
     p.learning_velocity = m.learning_velocity
     p.confidence_score = m.confidence_score
+    p.behavioral_signals = BehavioralSignals.from_dict(m.behavioral_signals)
     p.last_active = m.last_active
     p.created_at = m.created_at
     p.updated_at = m.updated_at
@@ -141,6 +142,7 @@ class StudentProfileRepository(AbstractStudentProfileRepository):
             current_chapter=profile.current_chapter,
             learning_velocity=profile.learning_velocity,
             confidence_score=profile.confidence_score,
+            behavioral_signals=profile.behavioral_signals.to_dict(),
         )
         self._db.add(m)
         await self._db.flush()
@@ -165,6 +167,7 @@ class StudentProfileRepository(AbstractStudentProfileRepository):
         m.current_chapter = profile.current_chapter
         m.learning_velocity = profile.learning_velocity
         m.confidence_score = profile.confidence_score
+        m.behavioral_signals = profile.behavioral_signals.to_dict()
         m.last_active = profile.last_active
         m.updated_at = profile.updated_at
         await self._db.flush()
@@ -242,6 +245,17 @@ class LearningSessionRepository(AbstractLearningSessionRepository):
             .limit(50)
         )
         return [r for r in result.scalars().all() if r]
+
+    async def list_since(self, user_id: UUID, since: datetime) -> list[LearningSession]:
+        result = await self._db.execute(
+            select(LearningSessionModel)
+            .where(
+                LearningSessionModel.user_id == str(user_id),
+                LearningSessionModel.created_at >= since,
+            )
+            .order_by(LearningSessionModel.created_at.desc())
+        )
+        return [_to_session(m) for m in result.scalars().all()]
 
 
 # ── Concept Node ──────────────────────────────────────────────────────────────

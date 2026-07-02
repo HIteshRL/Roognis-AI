@@ -9,7 +9,9 @@ import structlog
 
 from src.application.dtos.learning import ConceptExtractionResult
 from src.application.services.concept_extraction_service import ConceptExtractionService
+from src.application.services.learner_behavior_service import LearnerBehaviorService
 from src.application.services.learning_gap_detector import LearningGapDetector
+from src.application.services.learning_velocity_service import LearningVelocityService
 from src.application.services.mastery_engine import MasteryEngine
 from src.application.services.session_memory_service import SessionMemoryService
 from src.application.services.student_profile_service import StudentProfileService
@@ -25,12 +27,16 @@ class LearningOrchestrator:
         session_svc: SessionMemoryService,
         mastery_engine: MasteryEngine,
         gap_detector: LearningGapDetector,
+        velocity_svc: LearningVelocityService | None = None,
+        behavior_svc: LearnerBehaviorService | None = None,
     ) -> None:
         self._extractor = extractor
         self._profiles = profile_svc
         self._sessions = session_svc
         self._mastery = mastery_engine
         self._gaps = gap_detector
+        self._velocity = velocity_svc
+        self._behavior = behavior_svc
 
     async def process(
         self,
@@ -90,9 +96,22 @@ class LearningOrchestrator:
                 chapter=chapter,
             )
 
+            # Auto-resolve gaps for concepts that reached mastery
+            await self._auto_resolve_gaps(user_id)
+
             # Refresh confidence score from current average mastery
             avg = await self._mastery.average(user_id)
             await self._profiles.refresh_confidence(user_id, avg)
+
+            # Refresh learning velocity trend (points/day over trailing window)
+            if self._velocity:
+                velocity = await self._velocity.compute_velocity(user_id)
+                await self._profiles.update_velocity(user_id, velocity)
+
+            # Recompute behavioral signals from session history
+            if self._behavior:
+                signals = await self._behavior.compute(user_id)
+                await self._profiles.update_behavioral_signals(user_id, signals)
 
             logger.info(
                 "learning_pipeline_complete",
@@ -108,3 +127,22 @@ class LearningOrchestrator:
                 error=str(exc),
                 exc_info=True,
             )
+
+    async def _auto_resolve_gaps(self, user_id: UUID) -> None:
+        mastery_records = await self._mastery.get_all(user_id)
+        mastered_concepts = {r.concept_id for r in mastery_records if r.score >= 85}
+        if not mastered_concepts:
+            return
+
+        active_gaps = await self._gaps.list_gaps(user_id, include_resolved=False)
+        for gap in active_gaps:
+            if gap.concept_id in mastered_concepts:
+                await self._gaps.resolve(gap.id)
+                logger.info(
+                    "gap_auto_resolved",
+                    user_id=str(user_id),
+                    concept=gap.concept_name,
+                    score=next(
+                        (r.score for r in mastery_records if r.concept_id == gap.concept_id), 0
+                    ),
+                )

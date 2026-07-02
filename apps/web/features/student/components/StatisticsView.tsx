@@ -3,7 +3,8 @@
 import { useQuery } from '@tanstack/react-query'
 import { studentApi } from '@/lib/api/student'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { BarChart3 } from 'lucide-react'
+import { Badge } from '@/components/ui/badge'
+import { BarChart3, TrendingUp, AlertTriangle, Activity, Flame } from 'lucide-react'
 
 const BLOOM_ORDER = ['Remember', 'Understand', 'Apply', 'Analyze', 'Evaluate', 'Create']
 const BLOOM_COLORS = [
@@ -21,6 +22,12 @@ export function StatisticsView() {
   const { data: masteryData } = useQuery({
     queryKey: ['student', 'mastery'],
     queryFn: () => studentApi.getMastery(),
+    select: (r) => r.data,
+  })
+
+  const { data: profileData } = useQuery({
+    queryKey: ['student', 'profile'],
+    queryFn: () => studentApi.getProfile(),
     select: (r) => r.data,
   })
 
@@ -44,6 +51,149 @@ export function StatisticsView() {
         <div className="text-sm text-muted-foreground">Loading statistics…</div>
       ) : (
         <>
+          {/* Learning velocity trend */}
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-base flex items-center gap-2">
+                <TrendingUp className="h-4 w-4" />
+                Learning Velocity
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="flex items-baseline gap-2">
+                <span className="text-3xl font-bold">{analytics?.velocity_trend?.toFixed(1) ?? '0.0'}</span>
+                <span className="text-sm text-muted-foreground">points/day (last 7 days)</span>
+              </div>
+              <p className="text-xs text-muted-foreground mt-1">
+                Weighted by Bloom's level of each session, penalised for misconceptions.
+              </p>
+            </CardContent>
+          </Card>
+
+          {/* Behavioral patterns */}
+          {profileData?.behavioral_signals && profileData.behavioral_signals.total_sessions >= 3 && (() => {
+            const bs = profileData.behavioral_signals
+            return (
+              <Card>
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-base flex items-center gap-2">
+                    <Activity className="h-4 w-4" />
+                    Learning Behavior Profile
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  <div className="grid grid-cols-2 gap-3 text-sm sm:grid-cols-3">
+                    {bs.preferred_bloom_level && (
+                      <div>
+                        <span className="text-xs text-muted-foreground">Preferred level</span>
+                        <p className="font-semibold">{bs.preferred_bloom_level}</p>
+                      </div>
+                    )}
+                    {bs.struggle_bloom_level && (
+                      <div>
+                        <span className="text-xs text-muted-foreground">Struggle level</span>
+                        <p className="font-semibold text-orange-600">{bs.struggle_bloom_level}</p>
+                      </div>
+                    )}
+                    <div>
+                      <span className="text-xs text-muted-foreground">Learning style</span>
+                      <p className="font-semibold capitalize">{bs.response_pattern}</p>
+                    </div>
+                    <div>
+                      <span className="text-xs text-muted-foreground">Complexity trend</span>
+                      <p className="font-semibold capitalize">{bs.question_complexity_trend}</p>
+                    </div>
+                    <div>
+                      <span className="text-xs text-muted-foreground">Frequency</span>
+                      <p className="font-semibold">{bs.sessions_per_day.toFixed(1)} sessions/day</p>
+                    </div>
+                    {bs.avg_session_duration_ms > 0 && (
+                      <div>
+                        <span className="text-xs text-muted-foreground">Avg duration</span>
+                        <p className="font-semibold">{Math.round(bs.avg_session_duration_ms / 1000)}s</p>
+                      </div>
+                    )}
+                    {bs.engagement_streak > 0 && (
+                      <div className="flex items-center gap-1.5">
+                        <Flame className="h-3.5 w-3.5 text-orange-500" />
+                        <div>
+                          <span className="text-xs text-muted-foreground">Streak</span>
+                          <p className="font-semibold">{bs.engagement_streak} days</p>
+                        </div>
+                      </div>
+                    )}
+                    {bs.dominant_subject && (
+                      <div>
+                        <span className="text-xs text-muted-foreground">Most studied</span>
+                        <p className="font-semibold">{bs.dominant_subject}</p>
+                      </div>
+                    )}
+                    <div>
+                      <span className="text-xs text-muted-foreground">Active misconceptions</span>
+                      <p className={`font-semibold ${bs.total_misconceptions > 0 ? 'text-orange-600' : 'text-green-600'}`}>
+                        {bs.total_misconceptions}
+                      </p>
+                    </div>
+                  </div>
+
+                  {bs.strengths.length > 0 && (
+                    <div className="pt-1">
+                      <span className="text-xs text-muted-foreground">Mastered concepts</span>
+                      <div className="flex flex-wrap gap-1.5 mt-1">
+                        {bs.strengths.map((s) => (
+                          <Badge key={s} variant="secondary" className="text-xs bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400">
+                            {s}
+                          </Badge>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {bs.recent_topics.length > 0 && (
+                    <div>
+                      <span className="text-xs text-muted-foreground">Recent topics</span>
+                      <div className="flex flex-wrap gap-1.5 mt-1">
+                        {bs.recent_topics.map((t) => (
+                          <Badge key={t} variant="outline" className="text-xs">
+                            {t}
+                          </Badge>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            )
+          })()}
+
+          {/* Retention risk */}
+          {analytics && analytics.at_risk_concepts.length > 0 && (
+            <Card className="border-orange-200">
+              <CardHeader className="pb-2">
+                <CardTitle className="text-base flex items-center gap-2 text-orange-700">
+                  <AlertTriangle className="h-4 w-4" />
+                  At Risk of Fading
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-2">
+                <p className="text-xs text-muted-foreground mb-2">
+                  Concepts you mastered but haven't reinforced recently — review these before they decay.
+                </p>
+                {analytics.at_risk_concepts.map((r) => (
+                  <div key={r.concept_id} className="flex items-center justify-between text-sm">
+                    <div className="flex items-center gap-2">
+                      <span className="truncate max-w-[180px]">{r.concept_name}</span>
+                      <Badge variant="outline" className="text-xs">
+                        {r.days_since_reinforced}d ago
+                      </Badge>
+                    </div>
+                    <span className="font-semibold text-orange-600">{Math.round(r.risk * 100)}% risk</span>
+                  </div>
+                ))}
+              </CardContent>
+            </Card>
+          )}
+
           {/* Bloom's taxonomy distribution */}
           <Card>
             <CardHeader className="pb-2">

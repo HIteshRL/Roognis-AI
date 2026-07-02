@@ -24,6 +24,7 @@ class PromptAssemblyService:
         user_message: str,
         history: list[LLMMessage],
         context: RetrievedContext,
+        learner_context: str | None = None,
     ) -> list[LLMMessage]:
         if context.has_context:
             system_template = await self._prompts.get("rag_system")
@@ -31,6 +32,9 @@ class PromptAssemblyService:
             system_content = system_template.replace("{context}", context_text)
         else:
             system_content = await self._prompts.get("rag_no_context")
+
+        if learner_context:
+            system_content = f"{system_content}\n\n{learner_context}"
 
         messages: list[LLMMessage] = [LLMMessage(role="system", content=system_content)]
         messages.extend(history)
@@ -41,6 +45,7 @@ class PromptAssemblyService:
             has_context=context.has_context,
             context_chunks=len(context.chunks),
             history_turns=len(history),
+            has_learner_context=learner_context is not None,
         )
         return messages
 

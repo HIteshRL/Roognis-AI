@@ -4,6 +4,7 @@ import structlog
 from fastapi import FastAPI
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
+from prometheus_fastapi_instrumentator import Instrumentator
 from pydantic import ValidationError
 
 from src.config import get_settings
@@ -74,3 +75,6 @@ app.add_exception_handler(Exception, unhandled_exception_handler)
 
 # ── Routes ────────────────────────────────────────────────────────────────────
 app.include_router(api_router)
+
+# ── Observability ───────────────────────────────────────────────────────────────
+Instrumentator().instrument(app).expose(app, endpoint="/metrics", include_in_schema=False)

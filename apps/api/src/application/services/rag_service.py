@@ -20,6 +20,7 @@ from src.application.dtos.knowledge import (
 )
 from src.application.services.context_validation_service import ContextValidationService
 from src.application.services.prompt_assembly_service import PromptAssemblyService
+from src.application.services.response_cache_service import ResponseCacheService
 from src.application.services.retrieval_service import RetrievalService
 from src.infrastructure.llm.base import AbstractLLMProvider, LLMConfig
 
@@ -41,17 +42,28 @@ class RagService:
         context_validation_svc: ContextValidationService,
         llm_provider: AbstractLLMProvider,
         llm_model: str = _DEFAULT_MODEL,
+        response_cache_svc: ResponseCacheService | None = None,
     ) -> None:
         self._retrieval = retrieval_svc
         self._prompt_assembly = prompt_assembly_svc
         self._context_validation = context_validation_svc
         self._llm = llm_provider
         self._llm_model = llm_model
+        self._cache = response_cache_svc
 
     async def query(self, request: RagQueryRequest) -> RagQueryResponse:
         t_total = time.monotonic()
 
         curriculum_payload = request.curriculum.to_payload_filter()
+
+        # ── Semantic cache check ────────────────────────────────────────────────
+        cache_scope = {**curriculum_payload, "_include_chunks": request.include_chunks}
+        if self._cache:
+            cached = await self._cache.get(request.query, cache_scope)
+            if cached:
+                logger.info("rag_cache_hit", query_len=len(request.query))
+                cached["observability"]["cache_hit"] = True
+                return RagQueryResponse(**cached)
 
         # ── Retrieve ──────────────────────────────────────────────────────────
         raw_context, retrieve_timing = await self._retrieval.retrieve(
@@ -124,7 +136,7 @@ class RagService:
             token_usage=observability.token_usage,
         )
 
-        return RagQueryResponse(
+        response = RagQueryResponse(
             query=request.query,
             answer=llm_response.content,
             has_context=validated.has_context,
@@ -132,3 +144,8 @@ class RagService:
             curriculum_filter=curriculum_payload,
             observability=observability,
         )
+
+        if self._cache:
+            await self._cache.set(request.query, cache_scope, response.model_dump(mode="json"))
+
+        return response

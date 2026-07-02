@@ -1,4 +1,5 @@
 from abc import ABC, abstractmethod
+from datetime import datetime
 from uuid import UUID
 
 from src.domain.entities.learning import (
@@ -39,6 +40,9 @@ class AbstractLearningSessionRepository(ABC):
 
     @abstractmethod
     async def recent_concepts(self, user_id: UUID, days: int) -> list[str]: ...
+
+    @abstractmethod
+    async def list_since(self, user_id: UUID, since: datetime) -> list[LearningSession]: ...
 
 
 class AbstractConceptNodeRepository(ABC):
