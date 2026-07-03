@@ -59,6 +59,38 @@ class ApiClient {
     return this.handle<T>(res)
   }
 
+  async upload<T>(path: string, formData: FormData): Promise<ApiResponse<T>> {
+    const headers: Record<string, string> = {}
+    if (this.tokenFn) {
+      const token = await this.tokenFn()
+      if (token) headers['Authorization'] = `Bearer ${token}`
+    }
+    // Note: do NOT set Content-Type — the browser sets the multipart boundary.
+    const res = await fetch(`${this.baseUrl}${path}`, {
+      method: 'POST',
+      headers,
+      body: formData,
+    })
+    return this.handle<T>(res)
+  }
+
+  async fetchBlobUrl(path: string): Promise<string> {
+    const headers: Record<string, string> = {}
+    if (this.tokenFn) {
+      const token = await this.tokenFn()
+      if (token) headers['Authorization'] = `Bearer ${token}`
+    }
+    const res = await fetch(`${this.baseUrl}${path}`, {
+      method: 'GET',
+      headers,
+    })
+    if (!res.ok) {
+      throw new Error(`Failed to load resource: ${res.status}`)
+    }
+    const blob = await res.blob()
+    return URL.createObjectURL(blob)
+  }
+
   async streamPost(path: string, body: unknown): Promise<ReadableStream<string>> {
     const headers = await this.getHeaders()
     const res = await fetch(`${this.baseUrl}${path}`, {

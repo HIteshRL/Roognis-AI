@@ -53,6 +53,17 @@ dev = [
   "ruff==0.8.4",
   "mypy==1.13.0",
 ]
+# ── v0.71 — self-hosted LTX-Video (needs a CUDA GPU). Install with:
+#   pip install -e '.[video]'
+# Image generation (Fal) needs no extra deps — it uses the base httpx client.
+video = [
+  "torch>=2.4",
+  "diffusers>=0.32",
+  "transformers>=4.44",
+  "accelerate>=1.0",
+  "imageio[ffmpeg]>=2.36",
+  "sentencepiece>=0.2",
+]
 
 [tool.ruff]
 line-length = 100

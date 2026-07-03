@@ -6,6 +6,16 @@ class SendMessageRequest(BaseModel):
     conversation_id: UUID4 | None = None
     subject: str | None = None
     chapter: str | None = None
+    attachment_ids: list[UUID4] | None = None
+
+
+class AttachmentResponse(BaseModel):
+    id: str
+    kind: str
+    content_type: str
+    file_size: int
+    url: str
+    created_at: str
 
 
 class ConversationResponse(BaseModel):
@@ -32,6 +42,7 @@ class MessageResponse(BaseModel):
     content: str
     token_count: int | None
     created_at: str
+    attachments: list[AttachmentResponse] = []
 
 
 class ConversationWithMessagesResponse(BaseModel):

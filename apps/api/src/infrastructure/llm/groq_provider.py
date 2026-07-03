@@ -31,6 +31,27 @@ def _is_retryable(exc: Exception) -> bool:
     return False
 
 
+def _render_message(m: LLMMessage) -> dict:
+    """Render an LLMMessage into the Groq wire format.
+
+    Text-only messages keep a plain string content (backward compatible).
+    Messages carrying images use the multimodal content-parts array that
+    Groq's vision models expect.
+    """
+    if not m.has_images:
+        return {"role": m.role, "content": m.content}
+    parts: list[dict] = []
+    if m.content:
+        parts.append({"type": "text", "text": m.content})
+    for image_url in m.images or []:
+        parts.append({"type": "image_url", "image_url": {"url": image_url}})
+    return {"role": m.role, "content": parts}
+
+
+def _render_messages(messages: list[LLMMessage]) -> list[dict]:
+    return [_render_message(m) for m in messages]
+
+
 class GroqProvider(AbstractLLMProvider):
     def __init__(self, api_key: str) -> None:
         self._client = AsyncGroq(api_key=api_key)
@@ -45,7 +66,7 @@ class GroqProvider(AbstractLLMProvider):
             try:
                 response = await self._client.chat.completions.create(
                     model=config.model,
-                    messages=[{"role": m.role, "content": m.content} for m in messages],
+                    messages=_render_messages(messages),
                     temperature=config.temperature,
                     max_tokens=config.max_tokens,
                     stream=False,
@@ -86,7 +107,7 @@ class GroqProvider(AbstractLLMProvider):
             try:
                 stream = await self._client.chat.completions.create(
                     model=config.model,
-                    messages=[{"role": m.role, "content": m.content} for m in messages],
+                    messages=_render_messages(messages),
                     temperature=config.temperature,
                     max_tokens=config.max_tokens,
                     stream=True,

@@ -8,6 +8,9 @@ import rehypeSanitize from 'rehype-sanitize'
 import { Check, Copy } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import type { MessageDto } from '@roognis/shared'
+import { AttachmentImage } from './AttachmentImage'
+import { VideoAttachment } from './VideoAttachment'
+import { MessageVideoControl } from './MessageVideoControl'
 
 interface MessageBubbleProps {
   message: MessageDto
@@ -16,6 +19,10 @@ interface MessageBubbleProps {
 export function MessageBubble({ message }: MessageBubbleProps) {
   const [copied, setCopied] = useState(false)
   const isUser = message.role === 'user'
+  const attachments = message.attachments ?? []
+  const imageAttachments = attachments.filter((a) => a.kind === 'image')
+  const videoAttachments = attachments.filter((a) => a.kind === 'video')
+  const isAssistant = message.role === 'assistant'
 
   const handleCopy = async () => {
     await navigator.clipboard.writeText(message.content)
@@ -44,6 +51,14 @@ export function MessageBubble({ message }: MessageBubbleProps) {
             : 'rounded-tl-sm bg-muted text-foreground'
         )}
       >
+        {imageAttachments.length > 0 && (
+          <div className="mb-2 flex flex-wrap gap-2">
+            {imageAttachments.map((att) => (
+              <AttachmentImage key={att.id} attachment={att} />
+            ))}
+          </div>
+        )}
+
         {isUser ? (
           <p className="whitespace-pre-wrap text-sm">{message.content}</p>
         ) : (
@@ -55,6 +70,18 @@ export function MessageBubble({ message }: MessageBubbleProps) {
               {message.content}
             </ReactMarkdown>
           </div>
+        )}
+
+        {/* Generated explainer video(s) */}
+        {videoAttachments.map((att) => (
+          <div key={att.id} className="mt-2">
+            <VideoAttachment attachmentId={att.id} />
+          </div>
+        ))}
+
+        {/* On-demand video generation for assistant answers without a video yet */}
+        {isAssistant && videoAttachments.length === 0 && (
+          <MessageVideoControl messageId={message.id} />
         )}
 
         {/* Copy button */}

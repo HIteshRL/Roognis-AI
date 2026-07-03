@@ -21,6 +21,7 @@ export function useChat(conversationId?: string) {
     finalizeStreaming,
     clearPendingChat,
     setSourceMeta,
+    setStreamingImageId,
   } = useChatStore()
 
   useEffect(() => {
@@ -45,18 +46,38 @@ export function useChat(conversationId?: string) {
   }, [messages.length, streaming?.content])
 
   const sendMessage = useCallback(
-    async (content: string) => {
-      if (!content.trim() || streaming?.isStreaming) return
+    async (content: string, files?: File[]) => {
+      const hasFiles = !!files && files.length > 0
+      const text = content.trim()
+      if ((!text && !hasFiles) || streaming?.isStreaming) return
+
+      const finalText =
+        text || 'Please look at this image and help me understand it.'
 
       startStreaming()
 
       try {
+        let attachmentIds: string[] = []
+        if (hasFiles) {
+          try {
+            const uploaded = await Promise.all(
+              files!.map((f) => chatApi.uploadAttachment(f)),
+            )
+            attachmentIds = uploaded.map((u) => u.data.id)
+          } catch {
+            finalizeStreaming()
+            toast.error('Failed to upload image')
+            return
+          }
+        }
+
         const isNewConversation = !activeConversationId
         const stream = await chatApi.sendMessage(
-          content,
+          finalText,
           activeConversationId ?? undefined,
           isNewConversation ? (pendingSubject ?? undefined) : undefined,
           isNewConversation ? (pendingChapter ?? undefined) : undefined,
+          attachmentIds,
         )
         const reader = stream.getReader()
         let newConversationId: string | null = null
@@ -85,6 +106,8 @@ export function useChat(conversationId?: string) {
                 }
               } else if (event.type === 'chunk' && event.content) {
                 appendStreamChunk(event.content)
+              } else if (event.type === 'image' && event.attachment_id) {
+                setStreamingImageId(event.attachment_id)
               } else if (event.type === 'done') {
                 finalizeStreaming()
               }
@@ -119,6 +142,7 @@ export function useChat(conversationId?: string) {
       setMessages,
       clearPendingChat,
       setSourceMeta,
+      setStreamingImageId,
       router,
     ]
   )

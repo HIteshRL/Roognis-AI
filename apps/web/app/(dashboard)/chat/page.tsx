@@ -1,8 +1,8 @@
 import type { Metadata } from 'next'
-import { ChatView } from '@/features/chat/components/ChatView'
+import { ClassroomChatView } from '@/features/chat/components/ClassroomChatView'
 
 export const metadata: Metadata = { title: 'Chat' }
 
 export default function ChatPage() {
-  return <ChatView />
+  return <ClassroomChatView />
 }

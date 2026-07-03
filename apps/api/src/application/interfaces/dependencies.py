@@ -9,6 +9,7 @@ from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
 from src.application.dtos.user import UserResponse
+from src.application.services.attachment_service import AttachmentService
 from src.application.services.auth_service import AuthService
 from src.application.services.chat_service import ChatService
 from src.application.services.concept_extraction_service import ConceptExtractionService
@@ -28,8 +29,11 @@ from src.application.services.learning_velocity_service import LearningVelocityS
 from src.application.services.mastery_engine import MasteryEngine
 from src.application.services.next_best_topic_engine import NextBestTopicEngine
 from src.application.services.prompt_assembly_service import PromptAssemblyService
+from src.application.services.quiz_generation_service import QuizGenerationService
+from src.application.services.quiz_service import QuizService
 from src.application.services.rag_service import RagService
 from src.application.services.response_cache_service import ResponseCacheService
+from src.application.services.response_image_service import ResponseImageService
 from src.application.services.retrieval_service import RetrievalService
 from src.application.services.search_service import SearchService
 from src.application.services.session_memory_service import SessionMemoryService
@@ -37,9 +41,13 @@ from src.application.services.skill_graph_service import SkillGraphService
 from src.application.services.student_profile_service import StudentProfileService
 from src.application.services.user_service import UserService
 from src.application.services.vector_service import VectorService
+from src.application.services.video_generation_service import VideoGenerationService
 from src.config import Settings, get_settings
 from src.domain.exceptions import AuthenticationError
 from src.infrastructure.cache.redis_client import get_redis
+from src.infrastructure.database.repositories.attachment_repository import (
+    MessageAttachmentRepository,
+)
 from src.infrastructure.database.repositories.conversation_repository import (
     ConversationRepository,
     MessageRepository,
@@ -59,17 +67,28 @@ from src.infrastructure.database.repositories.learning_repository import (
     MasteryRepository,
     StudentProfileRepository,
 )
+from src.infrastructure.database.repositories.media_job_repository import (
+    MediaJobRepository,
+)
 from src.infrastructure.database.repositories.profile_repository import (
     ProfileRepository,
     SettingsRepository,
 )
+from src.infrastructure.database.repositories.quiz_repository import (
+    QuizAttemptRepository,
+    QuizQuestionRepository,
+    QuizRepository,
+    QuizResponseRepository,
+)
 from src.infrastructure.database.repositories.user_repository import UserRepository
 from src.infrastructure.database.session import AsyncSession, get_db
 from src.infrastructure.embeddings.factory import get_embedding_provider
+from src.infrastructure.imagegen.factory import get_image_generator
 from src.infrastructure.llm.factory import get_llm_provider
 from src.infrastructure.llm.prompt_loader import PromptLoader
 from src.infrastructure.storage.local_storage import LocalFileStorage
 from src.infrastructure.vector.factory import get_vector_store
+from src.infrastructure.videogen.factory import get_video_generator
 
 logger = structlog.get_logger(__name__)
 _bearer = HTTPBearer(auto_error=False)
@@ -129,6 +148,18 @@ def get_user_service(db: Annotated[AsyncSession, Depends(get_db)]) -> UserServic
     )
 
 
+def get_attachment_service(
+    db: Annotated[AsyncSession, Depends(get_db)],
+    settings: Annotated[Settings, Depends(get_settings)],
+) -> AttachmentService:
+    return AttachmentService(
+        attachment_repo=MessageAttachmentRepository(db),
+        storage=LocalFileStorage(settings.storage_local_path),
+        allowed_image_types=settings.allowed_image_types,
+        max_image_size_bytes=settings.max_image_size_bytes,
+    )
+
+
 def get_chat_service(
     db: Annotated[AsyncSession, Depends(get_db)],
     settings: Annotated[Settings, Depends(get_settings)],
@@ -162,6 +193,23 @@ def get_chat_service(
         concept_memory_svc=concept_memory_svc,
     )
 
+    attachment_repo = MessageAttachmentRepository(db)
+    attachment_svc = AttachmentService(
+        attachment_repo=attachment_repo,
+        storage=LocalFileStorage(settings.storage_local_path),
+        allowed_image_types=settings.allowed_image_types,
+        max_image_size_bytes=settings.max_image_size_bytes,
+    )
+
+    response_image_svc = None
+    if settings.image_gen_enabled:
+        response_image_svc = ResponseImageService(
+            image_generator=get_image_generator(),
+            attachment_svc=attachment_svc,
+            attachment_repo=attachment_repo,
+            image_size=settings.image_gen_size,
+        )
+
     return ChatService(
         conversation_repo=ConversationRepository(db),
         message_repo=MessageRepository(db),
@@ -173,6 +221,28 @@ def get_chat_service(
         retrieval_enabled=settings.retrieval_enabled,
         learner_context_svc=learner_context_svc,
         profile_repo=StudentProfileRepository(db),
+        attachment_repo=attachment_repo,
+        attachment_svc=attachment_svc,
+        vision_model=settings.groq_vision_model,
+        vision_enabled=settings.vision_enabled,
+        response_image_svc=response_image_svc,
+        response_image_enabled=settings.response_image_enabled,
+    )
+
+
+def get_video_generation_service(
+    db: Annotated[AsyncSession, Depends(get_db)],
+    settings: Annotated[Settings, Depends(get_settings)],
+) -> VideoGenerationService:
+    return VideoGenerationService(
+        video_generator=get_video_generator(),
+        job_repo=MediaJobRepository(db),
+        message_repo=MessageRepository(db),
+        conversation_repo=ConversationRepository(db),
+        storage_path=settings.storage_local_path,
+        num_frames=settings.video_num_frames,
+        fps=settings.video_fps,
+        max_concurrent=settings.max_concurrent_video_jobs,
     )
 
 
@@ -400,3 +470,32 @@ def get_learning_path_service(
 
 def get_skill_graph_service() -> SkillGraphService:
     return SkillGraphService()
+
+
+# ── Quiz & Assessment ────────────────────────────────────────────────────────
+
+
+def get_quiz_generation_service(
+    db: Annotated[AsyncSession, Depends(get_db)],
+    settings: Annotated[Settings, Depends(get_settings)],
+) -> QuizGenerationService:
+    from groq import AsyncGroq
+
+    return QuizGenerationService(
+        groq_client=AsyncGroq(api_key=settings.groq_api_key),
+        mastery_repo=MasteryRepository(db),
+        concept_repo=ConceptNodeRepository(db),
+    )
+
+
+def get_quiz_service(
+    db: Annotated[AsyncSession, Depends(get_db)],
+) -> QuizService:
+    return QuizService(
+        quiz_repo=QuizRepository(db),
+        question_repo=QuizQuestionRepository(db),
+        attempt_repo=QuizAttemptRepository(db),
+        response_repo=QuizResponseRepository(db),
+        mastery_repo=MasteryRepository(db),
+        concept_repo=ConceptNodeRepository(db),
+    )

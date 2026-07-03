@@ -61,7 +61,8 @@ class ConversationRepository(AbstractConversationRepository):
         return _to_conversation(model) if model else None
 
     async def list_by_user(
-        self, user_id: UUID, page: int, limit: int, subject: str | None = None,
+        self, user_id: UUID, page: int, limit: int,
+        subject: str | None = None, chapter: str | None = None,
     ) -> tuple[list[Conversation], int]:
         offset = (page - 1) * limit
 
@@ -74,6 +75,8 @@ class ConversationRepository(AbstractConversationRepository):
                 filters.append(ConversationModel.subject.is_(None))
             else:
                 filters.append(ConversationModel.subject == subject)
+        if chapter:
+            filters.append(ConversationModel.chapter == chapter)
 
         total_result = await self._db.execute(
             select(func.count()).select_from(ConversationModel).where(*filters)
@@ -97,6 +100,21 @@ class ConversationRepository(AbstractConversationRepository):
                 ConversationModel.is_archived == False,  # noqa: E712
             )
             .group_by(ConversationModel.subject)
+        )
+        return list(result.all())
+
+    async def chapter_counts(
+        self, user_id: UUID, subject: str
+    ) -> list[tuple[str | None, int]]:
+        result = await self._db.execute(
+            select(ConversationModel.chapter, func.count())
+            .where(
+                ConversationModel.user_id == str(user_id),
+                ConversationModel.subject == subject,
+                ConversationModel.chapter.is_not(None),
+                ConversationModel.is_archived == False,  # noqa: E712
+            )
+            .group_by(ConversationModel.chapter)
         )
         return list(result.all())
 
@@ -139,6 +157,13 @@ class MessageRepository(AbstractMessageRepository):
         await self._db.flush()
         await self._db.refresh(model)
         return _to_message(model)
+
+    async def get_by_id(self, message_id: UUID) -> Message | None:
+        result = await self._db.execute(
+            select(MessageModel).where(MessageModel.id == str(message_id))
+        )
+        model = result.scalar_one_or_none()
+        return _to_message(model) if model else None
 
     async def list_by_conversation(
         self, conversation_id: UUID, limit: int | None = None

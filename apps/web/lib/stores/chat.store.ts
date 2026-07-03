@@ -19,6 +19,7 @@ interface ChatState {
   messages: MessageDto[]
   streaming: StreamingMessage | null
   lastSourceMeta: SourceMeta | null
+  streamingImageId: string | null
 
   selectedSubject: string | null
   pendingSubject: string | null
@@ -33,6 +34,7 @@ interface ChatState {
   appendStreamChunk: (chunk: string) => void
   finalizeStreaming: () => void
   setSourceMeta: (meta: SourceMeta) => void
+  setStreamingImageId: (id: string | null) => void
 
   setSelectedSubject: (subject: string | null) => void
   setPendingChat: (subject: string | null, chapter: string | null) => void
@@ -45,6 +47,7 @@ export const useChatStore = create<ChatState>((set) => ({
   messages: [],
   streaming: null,
   lastSourceMeta: null,
+  streamingImageId: null,
 
   selectedSubject: null,
   pendingSubject: null,
@@ -60,7 +63,8 @@ export const useChatStore = create<ChatState>((set) => ({
   removeConversation: (id) =>
     set((s) => ({ conversations: s.conversations.filter((c) => c.id !== id) })),
 
-  startStreaming: () => set({ streaming: { content: '', isStreaming: true }, lastSourceMeta: null }),
+  startStreaming: () =>
+    set({ streaming: { content: '', isStreaming: true }, lastSourceMeta: null, streamingImageId: null }),
 
   appendStreamChunk: (chunk) =>
     set((s) => ({
@@ -75,6 +79,7 @@ export const useChatStore = create<ChatState>((set) => ({
     })),
 
   setSourceMeta: (meta) => set({ lastSourceMeta: meta }),
+  setStreamingImageId: (id) => set({ streamingImageId: id }),
 
   setSelectedSubject: (subject) => set({ selectedSubject: subject }),
   setPendingChat: (subject, chapter) => set({ pendingSubject: subject, pendingChapter: chapter }),

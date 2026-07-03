@@ -193,4 +193,31 @@ export const studentApi = {
     ),
 
   getSkillProfile: () => apiClient.get<SkillProfile>('/api/v1/student/skills'),
+
+  // ── Quiz & Assessment ───────────────────────────────────────────────────
+
+  generateQuiz: (body: {
+    subject?: string | null
+    chapter?: string | null
+    concept_ids?: string[] | null
+    question_count?: number
+    difficulty?: string
+  }) => apiClient.post<import('@roognis/shared').QuizSummaryDto>('/api/v1/student/quiz/generate', body),
+
+  getQuizzes: (page = 1, limit = 20, subject?: string) =>
+    apiClient.get<{ data: import('@roognis/shared').QuizSummaryDto[]; pagination: { total: number; page: number; limit: number } }>(
+      `/api/v1/student/quiz?page=${page}&limit=${limit}${subject ? `&subject=${encodeURIComponent(subject)}` : ''}`
+    ),
+
+  getQuiz: (quizId: string) =>
+    apiClient.get<import('@roognis/shared').QuizDetailDto>(`/api/v1/student/quiz/${quizId}`),
+
+  submitQuiz: (quizId: string, responses: import('@roognis/shared').SubmitResponseDto[]) =>
+    apiClient.post<import('@roognis/shared').QuizAttemptDto>(`/api/v1/student/quiz/${quizId}/submit`, { responses }),
+
+  getAttemptResults: (attemptId: string) =>
+    apiClient.get<import('@roognis/shared').QuizResultDto>(`/api/v1/student/quiz/attempts/${attemptId}/results`),
+
+  getQuizHistory: (limit = 10) =>
+    apiClient.get<import('@roognis/shared').QuizHistoryItemDto[]>(`/api/v1/student/quiz/history?limit=${limit}`),
 }

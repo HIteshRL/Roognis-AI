@@ -1,3 +1,4 @@
+from src.infrastructure.database.models.attachment import MessageAttachmentModel
 from src.infrastructure.database.models.conversation import ConversationModel, MessageModel
 from src.infrastructure.database.models.knowledge import (
     DocumentChunkModel,
@@ -5,6 +6,7 @@ from src.infrastructure.database.models.knowledge import (
     IngestionJobModel,
     KnowledgeBaseModel,
 )
+from src.infrastructure.database.models.media_job import MediaJobModel
 from src.infrastructure.database.models.profile import ProfileModel, SettingsModel
 from src.infrastructure.database.models.system import (
     ApiUsageModel,
@@ -21,6 +23,8 @@ __all__ = [
     "SettingsModel",
     "ConversationModel",
     "MessageModel",
+    "MessageAttachmentModel",
+    "MediaJobModel",
     "SessionModel",
     "AuditLogModel",
     "SystemLogModel",

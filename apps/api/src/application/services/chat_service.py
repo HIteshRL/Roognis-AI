@@ -1,3 +1,4 @@
+import asyncio
 import json
 from collections.abc import AsyncGenerator
 from uuid import UUID
@@ -5,6 +6,7 @@ from uuid import UUID
 import structlog
 
 from src.application.dtos.chat import (
+    AttachmentResponse,
     ConversationResponse,
     ConversationWithMessagesResponse,
     MessageResponse,
@@ -42,6 +44,12 @@ class ChatService:
         retrieval_enabled: bool = True,
         learner_context_svc: LearnerContextService | None = None,
         profile_repo=None,
+        attachment_repo=None,
+        attachment_svc=None,
+        vision_model: str | None = None,
+        vision_enabled: bool = False,
+        response_image_svc=None,
+        response_image_enabled: bool = False,
     ) -> None:
         self._conversations = conversation_repo
         self._messages = message_repo
@@ -53,6 +61,12 @@ class ChatService:
         self._retrieval_enabled = retrieval_enabled
         self._learner_context = learner_context_svc
         self._profile_repo = profile_repo
+        self._attachment_repo = attachment_repo
+        self._attachment_svc = attachment_svc
+        self._vision_model = vision_model
+        self._vision_enabled = vision_enabled
+        self._response_image_svc = response_image_svc
+        self._response_image_enabled = response_image_enabled
 
     async def stream_response(
         self,
@@ -72,6 +86,37 @@ class ChatService:
             content=dto.message,
         )
         await self._messages.create(user_msg)
+
+        # ── Phase 0.7: link uploaded images and prepare them for the vision call
+        image_data_urls: list[str] = []
+        if dto.attachment_ids and self._attachment_svc and self._attachment_repo:
+            try:
+                owned_ids, image_data_urls = await self._attachment_svc.data_urls_for(
+                    dto.attachment_ids, user_id
+                )
+                if owned_ids:
+                    await self._attachment_repo.link_to_message(owned_ids, user_msg.id)
+            except Exception as exc:
+                logger.warning(
+                    "attachment_link_failed", error=str(exc), user_id=str(user_id)
+                )
+                image_data_urls = []
+
+        use_vision = bool(image_data_urls) and self._vision_enabled and bool(
+            self._vision_model
+        )
+
+        # ── v0.71: start generating the default illustrative image now so it
+        # overlaps retrieval + text streaming. Persisted after the answer saves.
+        image_task = None
+        if self._response_image_enabled and self._response_image_svc:
+            img_prompt = self._response_image_svc.build_prompt(
+                question=dto.message,
+                primary_concept=None,
+                subject=conversation.subject,
+                chapter=conversation.chapter,
+            )
+            image_task = asyncio.create_task(self._response_image_svc.generate(img_prompt))
 
         if not conversation.title:
             conversation.set_title(dto.message[:80])
@@ -159,7 +204,17 @@ class ChatService:
                 "sources": [],
             }
 
-        config = LLMConfig(model=llm_model, temperature=temperature, stream=True)
+        # ── Phase 0.7: route to the vision model and attach images to the
+        # final user turn. The image parts ride on the last user message
+        # regardless of which prompt-assembly path produced llm_messages.
+        if use_vision:
+            for msg in reversed(llm_messages):
+                if msg.role == "user":
+                    msg.images = image_data_urls
+                    break
+
+        model = self._vision_model if use_vision else llm_model
+        config = LLMConfig(model=model, temperature=temperature, stream=True)
         full_content: list[str] = []
 
         meta = {
@@ -168,6 +223,7 @@ class ChatService:
             "subject": conversation.subject,
             "chapter": conversation.chapter,
             "rag": sources_meta,
+            "vision": use_vision,
         }
         yield f"data: {json.dumps(meta)}\n\n"
 
@@ -182,6 +238,26 @@ class ChatService:
             content="".join(full_content),
         )
         saved = await self._messages.create(assistant_msg)
+
+        # ── v0.71: persist the default generated image and notify the client.
+        if image_task is not None:
+            try:
+                result = await image_task
+            except Exception:
+                result = None
+            if result is not None:
+                attachment = await self._response_image_svc.persist(
+                    user_id, saved.id, result
+                )
+                if attachment is not None:
+                    image_event = {
+                        "type": "image",
+                        "attachment_id": str(attachment.id),
+                        "url": f"/api/v1/chat/attachments/{attachment.id}",
+                        "content_type": attachment.content_type,
+                    }
+                    yield f"data: {json.dumps(image_event)}\n\n"
+
         yield f'data: {{"type":"done","message_id":"{saved.id}"}}\n\n'
 
         logger.info(
@@ -193,10 +269,11 @@ class ChatService:
         )
 
     async def list_conversations(
-        self, user_id: UUID, page: int, limit: int, subject: str | None = None,
+        self, user_id: UUID, page: int, limit: int,
+        subject: str | None = None, chapter: str | None = None,
     ) -> tuple[list[ConversationResponse], int]:
         convs, total = await self._conversations.list_by_user(
-            user_id, page, limit, subject=subject,
+            user_id, page, limit, subject=subject, chapter=chapter,
         )
         responses = []
         for c in convs:
@@ -214,6 +291,12 @@ class ChatService:
             for subject, count in rows
         ]
 
+    async def get_chapters(
+        self, user_id: UUID, subject: str
+    ) -> list[tuple[str, int]]:
+        rows = await self._conversations.chapter_counts(user_id, subject)
+        return [(chapter, count) for chapter, count in rows if chapter]
+
     async def get_conversation(
         self, user_id: UUID, conversation_id: UUID
     ) -> ConversationWithMessagesResponse:
@@ -224,9 +307,25 @@ class ChatService:
             raise AuthorizationError("Access denied")
 
         messages = await self._messages.list_by_conversation(conversation_id)
+
+        attachments_by_message: dict[UUID, list] = {}
+        if self._attachment_repo and messages:
+            try:
+                rows = await self._attachment_repo.list_by_messages(
+                    [m.id for m in messages]
+                )
+                for a in rows:
+                    if a.message_id is not None:
+                        attachments_by_message.setdefault(a.message_id, []).append(a)
+            except Exception as exc:
+                logger.warning("load_attachments_failed", error=str(exc))
+
         return ConversationWithMessagesResponse(
             conversation=self._conv_to_response(conv, len(messages)),
-            messages=[self._msg_to_response(m) for m in messages],
+            messages=[
+                self._msg_to_response(m, attachments_by_message.get(m.id, []))
+                for m in messages
+            ],
         )
 
     async def delete_conversation(self, user_id: UUID, conversation_id: UUID) -> None:
@@ -292,7 +391,7 @@ class ChatService:
         return ctx
 
     @staticmethod
-    def _msg_to_response(m: Message) -> MessageResponse:
+    def _msg_to_response(m: Message, attachments: list | None = None) -> MessageResponse:
         return MessageResponse(
             id=str(m.id),
             conversation_id=str(m.conversation_id),
@@ -300,4 +399,15 @@ class ChatService:
             content=m.content,
             token_count=m.token_count,
             created_at=m.created_at.isoformat(),
+            attachments=[
+                AttachmentResponse(
+                    id=str(a.id),
+                    kind=a.kind,
+                    content_type=a.content_type,
+                    file_size=a.file_size,
+                    url=f"/api/v1/chat/attachments/{a.id}",
+                    created_at=a.created_at.isoformat(),
+                )
+                for a in (attachments or [])
+            ],
         )

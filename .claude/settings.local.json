@@ -19,7 +19,12 @@
       "Bash(git add *)",
       "Bash(git commit -m ' *)",
       "Bash(python -m pytest tests/services/test_mastery_engine.py tests/services/test_learning_gap_detector.py tests/services/test_knowledge_graph_service.py -v --tb=short)",
-      "Bash(python -m pytest tests/services/test_mastery_engine.py tests/services/test_learning_gap_detector.py tests/services/test_knowledge_graph_service.py -q)"
+      "Bash(python -m pytest tests/services/test_mastery_engine.py tests/services/test_learning_gap_detector.py tests/services/test_knowledge_graph_service.py -q)",
+      "Bash(python -m ruff check --fix apps/api/)",
+      "Bash(python -m ruff check --fix apps/api/src/)",
+      "Bash(python -m ruff check apps/api/src/)",
+      "Bash(grep -oE \"apps[\\\\\\\\/][^:]+\\\\.py\")",
+      "Bash(API_SECRET_KEY=test_secret_key_at_least_32_chars_long_xx DATABASE_URL=postgresql+asyncpg://u:p@localhost/db REDIS_URL=redis://localhost:6379 GROQ_API_KEY=test VIDEO_GEN_PROVIDER=stub IMAGE_GEN_PROVIDER=stub python -c ' *)"
     ]
   }
 }

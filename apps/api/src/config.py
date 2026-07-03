@@ -43,6 +43,35 @@ class Settings(BaseSettings):
     groq_max_tokens: int = 4096
     groq_temperature: float = 0.7
 
+    # ── Phase 0.7: Multimodal (vision) ───────────────────────────────────────
+    groq_vision_model: str = "meta-llama/llama-4-scout-17b-16e-instruct"
+    vision_enabled: bool = True
+    max_image_size_mb: int = 4
+    max_images_per_message: int = 4
+    allowed_image_types: list[str] = [
+        "image/jpeg",
+        "image/png",
+        "image/webp",
+        "image/gif",
+    ]
+
+    # ── v0.71: Generative image (hosted diffusion) ───────────────────────────
+    image_gen_enabled: bool = True
+    response_image_enabled: bool = True
+    image_gen_provider: Literal["fal", "stub"] = "fal"
+    fal_api_key: str = ""
+    image_gen_model: str = "fal-ai/flux/schnell"
+    image_gen_size: str = "1024x1024"
+
+    # ── v0.71: Generative video (self-hosted LTX-Video) ──────────────────────
+    video_gen_enabled: bool = True
+    video_gen_provider: Literal["ltx", "stub"] = "ltx"
+    ltx_model_id: str = "Lightricks/LTX-Video"
+    video_num_frames: int = 97
+    video_fps: int = 24
+    video_guidance_scale: float = 3.0
+    max_concurrent_video_jobs: int = 1
+
     # ── Rate Limiting ────────────────────────────────────────────────────────
     rate_limit_default: int = 100
     rate_limit_chat: int = 20
@@ -92,6 +121,10 @@ class Settings(BaseSettings):
     @property
     def max_upload_size_bytes(self) -> int:
         return self.max_upload_size_mb * 1024 * 1024
+
+    @property
+    def max_image_size_bytes(self) -> int:
+        return self.max_image_size_mb * 1024 * 1024
 
 
 @lru_cache
