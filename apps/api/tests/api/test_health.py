@@ -1,7 +1,8 @@
 ﻿import os
+from unittest.mock import AsyncMock
+
 import pytest
-from unittest.mock import AsyncMock, MagicMock, patch
-from httpx import AsyncClient, ASGITransport
+from httpx import ASGITransport, AsyncClient
 
 os.environ.setdefault("API_SECRET_KEY", "test-secret-key-that-is-at-least-32-chars-long")
 os.environ.setdefault("DATABASE_URL", "postgresql+asyncpg://test:test@localhost:5432/test")
@@ -16,9 +17,9 @@ configure_logging("INFO", "console")
 @pytest.mark.asyncio
 async def test_health_endpoint_degraded_when_db_down():
     """Health endpoint returns 200 even when DB is down â€” status field shows 'degraded'."""
-    from src.main import app
-    from src.infrastructure.database import session as db_session
     from src.infrastructure.cache import redis_client
+    from src.infrastructure.database import session as db_session
+    from src.main import app
 
     mock_session = AsyncMock()
     mock_session.execute = AsyncMock(side_effect=Exception("DB down"))

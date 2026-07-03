@@ -1,5 +1,7 @@
-import pytest
 from unittest.mock import AsyncMock
+
+import pytest
+
 from src.application.dtos.knowledge import RetrievedContext, SearchResultItem
 from src.application.services.prompt_assembly_service import PromptAssemblyService
 from src.infrastructure.llm.base import LLMMessage

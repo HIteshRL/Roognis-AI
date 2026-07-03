@@ -67,6 +67,8 @@ export interface ConversationDto extends Timestamps {
   id: UUID
   user_id: UUID
   title: string | null
+  subject: string | null
+  chapter: string | null
   is_archived: boolean
   message_count?: number
 }
@@ -83,6 +85,13 @@ export interface MessageDto {
 export interface SendMessageDto {
   message: string
   conversation_id?: UUID
+  subject?: string
+  chapter?: string
+}
+
+export interface SubjectCountDto {
+  subject: string
+  count: number
 }
 
 export interface ConversationWithMessagesDto {
@@ -91,6 +100,26 @@ export interface ConversationWithMessagesDto {
 }
 
 // ── Streaming DTOs ───────────────────────────────────────────────────────────
+
+export interface StreamSourceDto {
+  title: string | null
+  score: number
+  subject: string | null
+  chapter: string | null
+}
+
+export interface StreamMetaDto {
+  type: 'meta'
+  conversation_id: UUID
+  subject: string | null
+  chapter: string | null
+  rag: {
+    has_context: boolean
+    source_count: number
+    cascade_level: string
+    sources: StreamSourceDto[]
+  }
+}
 
 export interface StreamChunkDto {
   type: 'chunk' | 'done' | 'error'

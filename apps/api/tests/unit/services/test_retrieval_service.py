@@ -1,5 +1,7 @@
-import pytest
 from unittest.mock import AsyncMock
+
+import pytest
+
 from src.application.services.retrieval_service import RetrievalService
 from src.infrastructure.vector.base import SearchResult
 

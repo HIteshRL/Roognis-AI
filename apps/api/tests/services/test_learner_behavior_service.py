@@ -1,8 +1,9 @@
 """Unit tests for LearnerBehaviorService — Phase 0.3 behavioral analysis."""
-import pytest
 from datetime import UTC, datetime, timedelta
 from unittest.mock import AsyncMock
 from uuid import uuid4
+
+import pytest
 
 from src.application.services.learner_behavior_service import LearnerBehaviorService
 from src.domain.entities.learning import LearningGap, LearningSession, MasteryRecord

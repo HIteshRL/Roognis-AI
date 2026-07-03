@@ -1,3 +1,4 @@
+import json
 from collections.abc import AsyncGenerator
 from uuid import UUID
 
@@ -8,6 +9,7 @@ from src.application.dtos.chat import (
     ConversationWithMessagesResponse,
     MessageResponse,
     SendMessageRequest,
+    SubjectCountResponse,
 )
 from src.application.services.context_validation_service import ContextValidationService
 from src.application.services.learner_context_service import LearnerContextService
@@ -39,6 +41,7 @@ class ChatService:
         context_validation_svc: ContextValidationService | None = None,
         retrieval_enabled: bool = True,
         learner_context_svc: LearnerContextService | None = None,
+        profile_repo=None,
     ) -> None:
         self._conversations = conversation_repo
         self._messages = message_repo
@@ -49,6 +52,7 @@ class ChatService:
         self._context_validation = context_validation_svc
         self._retrieval_enabled = retrieval_enabled
         self._learner_context = learner_context_svc
+        self._profile_repo = profile_repo
 
     async def stream_response(
         self,
@@ -58,7 +62,9 @@ class ChatService:
         temperature: float,
         current_intent: str = "unknown",
     ) -> AsyncGenerator[str, None]:
-        conversation = await self._get_or_create_conversation(user_id, dto.conversation_id)
+        conversation = await self._get_or_create_conversation(
+            user_id, dto.conversation_id, subject=dto.subject, chapter=dto.chapter,
+        )
 
         user_msg = Message(
             conversation_id=conversation.id,
@@ -86,44 +92,84 @@ class ChatService:
             except Exception as exc:
                 logger.warning("learner_context_build_failed", error=str(exc), user_id=str(user_id))
 
-        # ── RAG: retrieve context, build grounded prompt ──────────────────────
+        # ── Subject/chapter scoping — reduces hallucination ──────────────────
+        subject_context = self._build_subject_context(conversation.subject, conversation.chapter)
+        if subject_context:
+            learner_context = (
+                f"{learner_context}\n\n{subject_context}" if learner_context else subject_context
+            )
+
+        # ── CAG: context-aware retrieval with curriculum scoping ────────────
         if self._retrieval_enabled and self._retrieval and self._prompt_assembly:
-            raw_context, _timing = await self._retrieval.retrieve(dto.message)
+            grade = await self._get_student_grade(user_id)
+
+            raw_context, retrieve_timing = await self._retrieval.retrieve_contextual(
+                query=dto.message,
+                subject=conversation.subject,
+                chapter=conversation.chapter,
+                grade=grade,
+            )
+            cascade_level = retrieve_timing.get("cascade_level", "unscoped")
+
             if self._context_validation:
                 context = self._context_validation.validate(raw_context)
             else:
                 context = raw_context
 
-            llm_messages = await self._prompt_assembly.build_messages(
-                user_message=dto.message,
-                history=history_msgs,
-                context=context,
-                learner_context=learner_context,
-            )
+            if context.has_context:
+                llm_messages = await self._prompt_assembly.build_messages(
+                    user_message=dto.message,
+                    history=history_msgs,
+                    context=context,
+                    learner_context=learner_context,
+                )
+            else:
+                system_prompt = await self._prompts.get("default_system")
+                if learner_context:
+                    system_prompt = f"{system_prompt}\n\n{learner_context}"
+                llm_messages = [LLMMessage(role="system", content=system_prompt)]
+                llm_messages.extend(history_msgs)
+                llm_messages.append(LLMMessage(role="user", content=dto.message))
 
             sources_meta = {
                 "has_context": context.has_context,
                 "source_count": len(context.chunks),
+                "cascade_level": cascade_level,
                 "sources": [
-                    {"title": c.document_title, "score": round(c.score, 3)}
+                    {
+                        "title": c.document_title,
+                        "score": round(c.score, 3),
+                        "subject": c.metadata.get("subject"),
+                        "chapter": c.metadata.get("chapter"),
+                    }
                     for c in context.chunks
                 ],
             }
         else:
-            # Phase 0.1 fallback — plain LLM without RAG
             system_prompt = await self._prompts.get("default_system")
             if learner_context:
                 system_prompt = f"{system_prompt}\n\n{learner_context}"
             llm_messages = [LLMMessage(role="system", content=system_prompt)]
             llm_messages.extend(history_msgs)
             llm_messages.append(LLMMessage(role="user", content=dto.message))
-            sources_meta = {"has_context": False, "source_count": 0, "sources": []}
+            sources_meta = {
+                "has_context": False,
+                "source_count": 0,
+                "cascade_level": "none",
+                "sources": [],
+            }
 
         config = LLMConfig(model=llm_model, temperature=temperature, stream=True)
         full_content: list[str] = []
 
-        import json
-        yield f'data: {{"type":"meta","conversation_id":"{conversation.id}","rag":{json.dumps(sources_meta)}}}\n\n'
+        meta = {
+            "type": "meta",
+            "conversation_id": str(conversation.id),
+            "subject": conversation.subject,
+            "chapter": conversation.chapter,
+            "rag": sources_meta,
+        }
+        yield f"data: {json.dumps(meta)}\n\n"
 
         async for chunk in self._llm.stream(llm_messages, config):
             full_content.append(chunk)
@@ -147,14 +193,26 @@ class ChatService:
         )
 
     async def list_conversations(
-        self, user_id: UUID, page: int, limit: int
+        self, user_id: UUID, page: int, limit: int, subject: str | None = None,
     ) -> tuple[list[ConversationResponse], int]:
-        convs, total = await self._conversations.list_by_user(user_id, page, limit)
+        convs, total = await self._conversations.list_by_user(
+            user_id, page, limit, subject=subject,
+        )
         responses = []
         for c in convs:
             count = await self._messages.count_by_conversation(c.id)
             responses.append(self._conv_to_response(c, count))
         return responses, total
+
+    async def get_subject_counts(self, user_id: UUID) -> list[SubjectCountResponse]:
+        rows = await self._conversations.subject_counts(user_id)
+        return [
+            SubjectCountResponse(
+                subject=subject or "General",
+                count=count,
+            )
+            for subject, count in rows
+        ]
 
     async def get_conversation(
         self, user_id: UUID, conversation_id: UUID
@@ -180,7 +238,11 @@ class ChatService:
         await self._conversations.delete(conversation_id)
 
     async def _get_or_create_conversation(
-        self, user_id: UUID, conversation_id: UUID | None
+        self,
+        user_id: UUID,
+        conversation_id: UUID | None,
+        subject: str | None = None,
+        chapter: str | None = None,
     ) -> Conversation:
         if conversation_id:
             conv = await self._conversations.get_by_id(conversation_id)
@@ -189,7 +251,9 @@ class ChatService:
             if conv.user_id != user_id:
                 raise AuthorizationError("Access denied")
             return conv
-        return await self._conversations.create(Conversation(user_id=user_id))
+        return await self._conversations.create(
+            Conversation(user_id=user_id, subject=subject, chapter=chapter)
+        )
 
     @staticmethod
     def _conv_to_response(c: Conversation, count: int = 0) -> ConversationResponse:
@@ -197,11 +261,35 @@ class ChatService:
             id=str(c.id),
             user_id=str(c.user_id),
             title=c.title,
+            subject=c.subject,
+            chapter=c.chapter,
             is_archived=c.is_archived,
             created_at=c.created_at.isoformat(),
             updated_at=c.updated_at.isoformat(),
             message_count=count,
         )
+
+    async def _get_student_grade(self, user_id: UUID) -> str | None:
+        if not self._profile_repo:
+            return None
+        try:
+            profile = await self._profile_repo.get_by_user_id(user_id)
+            return profile.grade if profile else None
+        except Exception:
+            return None
+
+    @staticmethod
+    def _build_subject_context(subject: str | None, chapter: str | None) -> str | None:
+        if not subject:
+            return None
+        ctx = f"## Subject Focus\nThis conversation is scoped to **{subject}**"
+        if chapter:
+            ctx += f", chapter: **{chapter}**"
+        ctx += (
+            ".\nKeep all explanations relevant to this subject and chapter. "
+            "If the student asks about unrelated topics, gently redirect them."
+        )
+        return ctx
 
     @staticmethod
     def _msg_to_response(m: Message) -> MessageResponse:

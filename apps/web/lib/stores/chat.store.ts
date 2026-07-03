@@ -1,9 +1,16 @@
 import { create } from 'zustand'
-import type { ConversationDto, MessageDto } from '@roognis/shared'
+import type { ConversationDto, MessageDto, StreamSourceDto } from '@roognis/shared'
 
 interface StreamingMessage {
   content: string
   isStreaming: boolean
+}
+
+interface SourceMeta {
+  hasContext: boolean
+  sourceCount: number
+  cascadeLevel: string
+  sources: StreamSourceDto[]
 }
 
 interface ChatState {
@@ -11,6 +18,11 @@ interface ChatState {
   conversations: ConversationDto[]
   messages: MessageDto[]
   streaming: StreamingMessage | null
+  lastSourceMeta: SourceMeta | null
+
+  selectedSubject: string | null
+  pendingSubject: string | null
+  pendingChapter: string | null
 
   setActiveConversation: (id: string | null) => void
   setConversations: (convs: ConversationDto[]) => void
@@ -20,6 +32,11 @@ interface ChatState {
   startStreaming: () => void
   appendStreamChunk: (chunk: string) => void
   finalizeStreaming: () => void
+  setSourceMeta: (meta: SourceMeta) => void
+
+  setSelectedSubject: (subject: string | null) => void
+  setPendingChat: (subject: string | null, chapter: string | null) => void
+  clearPendingChat: () => void
 }
 
 export const useChatStore = create<ChatState>((set) => ({
@@ -27,6 +44,11 @@ export const useChatStore = create<ChatState>((set) => ({
   conversations: [],
   messages: [],
   streaming: null,
+  lastSourceMeta: null,
+
+  selectedSubject: null,
+  pendingSubject: null,
+  pendingChapter: null,
 
   setActiveConversation: (id) => set({ activeConversationId: id }),
   setConversations: (conversations) => set({ conversations }),
@@ -38,7 +60,7 @@ export const useChatStore = create<ChatState>((set) => ({
   removeConversation: (id) =>
     set((s) => ({ conversations: s.conversations.filter((c) => c.id !== id) })),
 
-  startStreaming: () => set({ streaming: { content: '', isStreaming: true } }),
+  startStreaming: () => set({ streaming: { content: '', isStreaming: true }, lastSourceMeta: null }),
 
   appendStreamChunk: (chunk) =>
     set((s) => ({
@@ -51,4 +73,10 @@ export const useChatStore = create<ChatState>((set) => ({
     set((s) => ({
       streaming: s.streaming ? { ...s.streaming, isStreaming: false } : null,
     })),
+
+  setSourceMeta: (meta) => set({ lastSourceMeta: meta }),
+
+  setSelectedSubject: (subject) => set({ selectedSubject: subject }),
+  setPendingChat: (subject, chapter) => set({ pendingSubject: subject, pendingChapter: chapter }),
+  clearPendingChat: () => set({ pendingSubject: null, pendingChapter: null }),
 }))

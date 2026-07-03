@@ -38,8 +38,9 @@ async def send_message(
     user_id = UUID(current_user.id)
     question = body.message
     conversation_id = body.conversation_id
+    subject = body.subject
+    chapter = body.chapter
 
-    # Classify intent synchronously before streaming — used in system prompt and session record
     current_intent = intent_engine.classify(question)
 
     async def event_stream():
@@ -60,6 +61,8 @@ async def send_message(
             question=question,
             ai_response=ai_text,
             conversation_id=conversation_id,
+            subject=subject,
+            chapter=chapter,
             intent=current_intent,
         )
 
@@ -76,6 +79,19 @@ async def send_message(
     )
 
 
+@router.get("/subjects")
+async def list_subjects(
+    request: Request,
+    current_user: Annotated[UserResponse, Depends(get_current_user)],
+    chat_svc: Annotated[ChatService, Depends(get_chat_service)],
+):
+    counts = await chat_svc.get_subject_counts(UUID(current_user.id))
+    return ok(
+        [c.model_dump() for c in counts],
+        request_id=request.state.request_id,
+    )
+
+
 @router.get("/history")
 async def list_conversations(
     request: Request,
@@ -83,9 +99,10 @@ async def list_conversations(
     chat_svc: Annotated[ChatService, Depends(get_chat_service)],
     page: int = Query(default=1, ge=1),
     limit: int = Query(default=20, ge=1, le=100),
+    subject: str | None = Query(default=None),
 ):
     conversations, total = await chat_svc.list_conversations(
-        UUID(current_user.id), page, limit
+        UUID(current_user.id), page, limit, subject=subject,
     )
     return paginated(
         data=[c.model_dump() for c in conversations],

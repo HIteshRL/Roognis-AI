@@ -1,7 +1,8 @@
 """Unit tests for KnowledgeGraphService."""
-import pytest
-from unittest.mock import AsyncMock, MagicMock
+from unittest.mock import AsyncMock
 from uuid import uuid4
+
+import pytest
 
 from src.application.services.knowledge_graph_service import KnowledgeGraphService
 from src.domain.entities.learning import ConceptEdge, ConceptNode

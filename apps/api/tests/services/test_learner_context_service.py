@@ -1,7 +1,8 @@
 """Unit tests for LearnerContextService — Phase 0.3 profile-to-prompt injection."""
-import pytest
 from unittest.mock import AsyncMock
 from uuid import uuid4
+
+import pytest
 
 from src.application.services.learner_context_service import LearnerContextService
 from src.domain.entities.learning import (

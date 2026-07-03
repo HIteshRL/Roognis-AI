@@ -172,6 +172,7 @@ def get_chat_service(
         context_validation_svc=context_validation_svc,
         retrieval_enabled=settings.retrieval_enabled,
         learner_context_svc=learner_context_svc,
+        profile_repo=StudentProfileRepository(db),
     )
 
 

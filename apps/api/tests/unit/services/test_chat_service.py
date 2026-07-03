@@ -1,9 +1,8 @@
-import pytest
 from uuid import uuid4
 
-from src.application.dtos.chat import SendMessageRequest
+import pytest
+
 from src.application.services.chat_service import ChatService
-from src.domain.entities.conversation import Conversation, Message
 from src.domain.exceptions import AuthorizationError, EntityNotFound
 
 

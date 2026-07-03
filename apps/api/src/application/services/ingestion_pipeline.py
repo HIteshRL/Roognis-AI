@@ -5,19 +5,13 @@ Orchestrates the full document ingestion pipeline:
 Designed to run as a FastAPI BackgroundTask.
 Each step updates the IngestionJob record so the frontend can poll progress.
 """
-import structlog
 from uuid import UUID
 
-from sqlalchemy.ext.asyncio import AsyncSession
+import structlog
 
 from src.application.services.chunking_service import ChunkingService
 from src.application.services.vector_service import VectorService
 from src.domain.entities.knowledge import DocumentChunk
-from src.domain.repositories.knowledge_repository import (
-    AbstractChunkRepository,
-    AbstractDocumentRepository,
-    AbstractIngestionJobRepository,
-)
 from src.infrastructure.database.repositories.knowledge_repository import (
     ChunkRepository,
     DocumentRepository,

@@ -1,7 +1,8 @@
 """Unit tests for ResponseCacheService — Phase 0.1 semantic RAG response cache."""
 import json
-import pytest
 from unittest.mock import AsyncMock
+
+import pytest
 
 from src.application.services.response_cache_service import ResponseCacheService
 

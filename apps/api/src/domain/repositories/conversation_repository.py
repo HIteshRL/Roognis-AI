@@ -13,8 +13,11 @@ class AbstractConversationRepository(ABC):
 
     @abstractmethod
     async def list_by_user(
-        self, user_id: UUID, page: int, limit: int
+        self, user_id: UUID, page: int, limit: int, subject: str | None = None,
     ) -> tuple[list[Conversation], int]: ...
+
+    @abstractmethod
+    async def subject_counts(self, user_id: UUID) -> list[tuple[str | None, int]]: ...
 
     @abstractmethod
     async def update(self, conversation: Conversation) -> Conversation: ...

@@ -1,6 +1,6 @@
+from unittest.mock import AsyncMock
+
 import pytest
-from unittest.mock import AsyncMock, patch
-from uuid import uuid4
 
 from src.application.dtos.auth import LoginRequest, RegisterRequest
 from src.application.services.auth_service import AuthService

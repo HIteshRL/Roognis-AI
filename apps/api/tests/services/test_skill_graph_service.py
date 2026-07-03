@@ -1,6 +1,7 @@
 """Unit tests for SkillGraphService."""
-import pytest
 from uuid import uuid4
+
+import pytest
 
 from src.application.services.skill_graph_service import SkillGraphService
 from src.domain.entities.learning import LearningSession, MasteryRecord

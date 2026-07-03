@@ -12,14 +12,17 @@ export function useChat(conversationId?: string) {
     messages,
     streaming,
     activeConversationId,
+    pendingSubject,
+    pendingChapter,
     setActiveConversation,
     setMessages,
     startStreaming,
     appendStreamChunk,
     finalizeStreaming,
+    clearPendingChat,
+    setSourceMeta,
   } = useChatStore()
 
-  // Load conversation messages when id changes
   useEffect(() => {
     if (!conversationId) {
       setMessages([])
@@ -37,7 +40,6 @@ export function useChat(conversationId?: string) {
       .catch(() => toast.error('Could not load conversation'))
   }, [conversationId, activeConversationId, setMessages, setActiveConversation])
 
-  // Scroll to bottom on new content
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [messages.length, streaming?.content])
@@ -49,7 +51,13 @@ export function useChat(conversationId?: string) {
       startStreaming()
 
       try {
-        const stream = await chatApi.sendMessage(content, activeConversationId ?? undefined)
+        const isNewConversation = !activeConversationId
+        const stream = await chatApi.sendMessage(
+          content,
+          activeConversationId ?? undefined,
+          isNewConversation ? (pendingSubject ?? undefined) : undefined,
+          isNewConversation ? (pendingChapter ?? undefined) : undefined,
+        )
         const reader = stream.getReader()
         let newConversationId: string | null = null
 
@@ -67,6 +75,14 @@ export function useChat(conversationId?: string) {
               const event = JSON.parse(raw)
               if (event.type === 'meta' && event.conversation_id) {
                 newConversationId = event.conversation_id
+                if (event.rag) {
+                  setSourceMeta({
+                    hasContext: event.rag.has_context,
+                    sourceCount: event.rag.source_count,
+                    cascadeLevel: event.rag.cascade_level ?? 'none',
+                    sources: event.rag.sources ?? [],
+                  })
+                }
               } else if (event.type === 'chunk' && event.content) {
                 appendStreamChunk(event.content)
               } else if (event.type === 'done') {
@@ -78,9 +94,9 @@ export function useChat(conversationId?: string) {
           }
         }
 
-        // Reload full conversation to get persisted messages
         if (newConversationId && newConversationId !== activeConversationId) {
           setActiveConversation(newConversationId)
+          clearPendingChat()
           router.push(`/chat/${newConversationId}`)
         } else if (activeConversationId) {
           const res = await chatApi.getConversation(activeConversationId)
@@ -94,11 +110,15 @@ export function useChat(conversationId?: string) {
     [
       activeConversationId,
       streaming,
+      pendingSubject,
+      pendingChapter,
       startStreaming,
       appendStreamChunk,
       finalizeStreaming,
       setActiveConversation,
       setMessages,
+      clearPendingChat,
+      setSourceMeta,
       router,
     ]
   )

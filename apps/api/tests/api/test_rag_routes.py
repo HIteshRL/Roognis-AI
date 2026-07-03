@@ -2,10 +2,11 @@
 Tests for /rag/* endpoints — curriculum-filtered RAG API.
 """
 import os
-import pytest
-from unittest.mock import AsyncMock, MagicMock, patch
-from httpx import AsyncClient, ASGITransport
 from datetime import datetime
+from unittest.mock import AsyncMock
+
+import pytest
+from httpx import ASGITransport, AsyncClient
 
 os.environ.setdefault("API_SECRET_KEY", "test-secret-key-that-is-at-least-32-chars-long")
 os.environ.setdefault("DATABASE_URL", "postgresql+asyncpg://test:test@localhost:5432/test")
@@ -13,10 +14,10 @@ os.environ.setdefault("REDIS_URL", "redis://localhost:6379/0")
 os.environ.setdefault("GROQ_API_KEY", "test-key")
 
 from src.infrastructure.logging.setup import configure_logging
+
 configure_logging("INFO", "console")
 
 from src.application.dtos.knowledge import (
-    CurriculumFilter,
     RagChunkResult,
     RagObservability,
     RagQueryResponse,
@@ -52,8 +53,8 @@ def _student_user():
 
 @pytest.mark.asyncio
 async def test_rag_query_returns_structured_response():
-    from src.main import app
     from src.application.interfaces import dependencies
+    from src.main import app
 
     mock_rag_result = RagQueryResponse(
         query="What is photosynthesis?",
@@ -131,9 +132,9 @@ async def test_rag_query_requires_auth():
 
 @pytest.mark.asyncio
 async def test_rag_status_returns_job():
-    from src.main import app
-    from src.application.interfaces import dependencies
     from src.application.dtos.knowledge import IngestionJobResponse
+    from src.application.interfaces import dependencies
+    from src.main import app
 
     mock_doc_svc = AsyncMock()
     mock_doc_svc.get_job_status = AsyncMock(return_value=IngestionJobResponse(
@@ -163,8 +164,8 @@ async def test_rag_status_returns_job():
 
 @pytest.mark.asyncio
 async def test_rag_delete_requires_admin():
-    from src.main import app
     from src.application.interfaces import dependencies
+    from src.main import app
 
     # Student cannot delete
     app.dependency_overrides[dependencies.get_current_user] = lambda: _student_user()
@@ -180,8 +181,8 @@ async def test_rag_delete_requires_admin():
 
 @pytest.mark.asyncio
 async def test_rag_delete_as_admin():
-    from src.main import app
     from src.application.interfaces import dependencies
+    from src.main import app
 
     mock_doc_svc = AsyncMock()
     mock_doc_svc.delete_document = AsyncMock(return_value=None)
@@ -204,8 +205,8 @@ async def test_rag_delete_as_admin():
 
 @pytest.mark.asyncio
 async def test_rag_query_validation_error_on_empty_query():
-    from src.main import app
     from src.application.interfaces import dependencies
+    from src.main import app
 
     app.dependency_overrides[dependencies.get_current_user] = lambda: _student_user()
     app.dependency_overrides[dependencies.get_rag_service] = lambda: AsyncMock()

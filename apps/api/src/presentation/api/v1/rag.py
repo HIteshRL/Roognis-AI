@@ -4,17 +4,13 @@
 All query endpoints enforce strict academic hierarchy filtering.
 The LLM answers ONLY from retrieved curriculum context.
 """
-from typing import Annotated
 from uuid import UUID
 
-from fastapi import APIRouter, BackgroundTasks, Depends, File, Form, Query, Request, UploadFile
+from fastapi import APIRouter, BackgroundTasks, Depends, File, Form, Request, UploadFile
 
 from src.application.dtos.knowledge import (
-    CurriculumFilter,
     DocumentUploadResponse,
-    IngestionJobResponse,
     RagQueryRequest,
-    RagQueryResponse,
 )
 from src.application.dtos.user import UserResponse
 from src.application.interfaces.dependencies import (

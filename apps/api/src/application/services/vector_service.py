@@ -65,7 +65,7 @@ class VectorService:
                         **chunk.metadata,
                     },
                 )
-                for chunk, vector in zip(batch, result.vectors)
+                for chunk, vector in zip(batch, result.vectors, strict=False)
             ]
             await self._store.upsert(points)
 

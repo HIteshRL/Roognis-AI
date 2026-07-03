@@ -1,8 +1,9 @@
 ﻿import os
-import pytest
 from datetime import datetime
-from unittest.mock import AsyncMock, patch
-from httpx import AsyncClient, ASGITransport
+from unittest.mock import AsyncMock
+
+import pytest
+from httpx import ASGITransport, AsyncClient
 
 os.environ.setdefault("API_SECRET_KEY", "test-secret-key-that-is-at-least-32-chars-long")
 os.environ.setdefault("DATABASE_URL", "postgresql+asyncpg://test:test@localhost:5432/test")
@@ -29,8 +30,8 @@ def _mock_user_response():
 
 @pytest.mark.asyncio
 async def test_register_returns_structured_response():
-    from src.main import app
     from src.application.interfaces import dependencies
+    from src.main import app
 
     mock_service = AsyncMock()
     mock_service.register = AsyncMock(return_value=(_mock_user_response(), "test-token"))

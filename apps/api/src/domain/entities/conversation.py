@@ -8,6 +8,8 @@ class Conversation:
     user_id: UUID
     id: UUID = field(default_factory=uuid4)
     title: str | None = None
+    subject: str | None = None
+    chapter: str | None = None
     is_archived: bool = False
     created_at: datetime = field(default_factory=lambda: datetime.now(UTC))
     updated_at: datetime = field(default_factory=lambda: datetime.now(UTC))

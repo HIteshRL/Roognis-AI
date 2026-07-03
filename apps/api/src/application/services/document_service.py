@@ -6,13 +6,12 @@ import structlog
 from src.application.dtos.knowledge import (
     ChunkResponse,
     DocumentResponse,
-    DocumentUploadResponse,
     IngestionJobResponse,
 )
 from src.application.services.vector_service import VectorService
 from src.config import Settings
 from src.domain.entities.knowledge import Document, IngestionJob
-from src.domain.exceptions import AuthorizationError, EntityNotFound, ValidationError
+from src.domain.exceptions import EntityNotFound, ValidationError
 from src.domain.repositories.knowledge_repository import (
     AbstractChunkRepository,
     AbstractDocumentRepository,

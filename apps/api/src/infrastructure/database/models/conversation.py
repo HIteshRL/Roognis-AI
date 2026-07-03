@@ -13,6 +13,8 @@ class ConversationModel(Base, UUIDMixin, TimestampMixin):
         ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True
     )
     title: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    subject: Mapped[str | None] = mapped_column(String(200), nullable=True, index=True)
+    chapter: Mapped[str | None] = mapped_column(String(200), nullable=True)
     is_archived: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
 
     user: Mapped["UserModel"] = relationship(back_populates="conversations")  # type: ignore[name-defined]  # noqa: F821

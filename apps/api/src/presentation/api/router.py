@@ -1,6 +1,17 @@
 from fastapi import APIRouter
 
-from src.presentation.api.v1 import admin, auth, chat, documents, library, rag, search, student, system, users
+from src.presentation.api.v1 import (
+    admin,
+    auth,
+    chat,
+    documents,
+    library,
+    rag,
+    search,
+    student,
+    system,
+    users,
+)
 
 api_router = APIRouter(prefix="/api/v1")
 

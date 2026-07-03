@@ -1,5 +1,6 @@
-import pytest
 from uuid import uuid4
+
+import pytest
 
 from src.application.dtos.user import UpdateProfileRequest, UpdateSettingsRequest
 from src.application.services.user_service import UserService

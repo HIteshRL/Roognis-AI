@@ -1,11 +1,9 @@
-from typing import Annotated
 from uuid import UUID
 
-from fastapi import APIRouter, BackgroundTasks, Depends, File, Form, Query, Request, UploadFile
+from fastapi import APIRouter, BackgroundTasks, Depends, File, Query, Request, UploadFile
 
 from src.application.dtos.knowledge import (
     DocumentUploadResponse,
-    IngestionJobResponse,
 )
 from src.application.dtos.user import UserResponse
 from src.application.interfaces.dependencies import (
