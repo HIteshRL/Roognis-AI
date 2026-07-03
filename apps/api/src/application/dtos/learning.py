@@ -57,6 +57,7 @@ class LearningSessionResponse(BaseModel):
     bloom_level: str
     difficulty_level: str
     misconceptions: list[str]
+    intent: str = "unknown"
     token_count: int
     duration_ms: int
     created_at: datetime
@@ -143,3 +144,44 @@ class ConceptExtractionResult(BaseModel):
     bloom_level: str = "Understand"
     difficulty: str = "medium"
     misconceptions: list[str] = Field(default_factory=list)
+
+
+class ConceptMemoryResponse(BaseModel):
+    id: UUID
+    concept_id: UUID
+    concept_name: str
+    times_taught: int
+    successful_approaches: int
+    failed_approaches: int
+    last_approach: str | None
+    teaching_notes: list[str]
+    success_rate: float
+    needs_different_approach: bool
+    last_taught: datetime
+
+
+class LearningPathNodeResponse(BaseModel):
+    concept_id: UUID
+    concept_name: str
+    subject: str | None
+    chapter: str | None
+    bloom_level: str
+    difficulty: str
+
+
+class LearningPathResponse(BaseModel):
+    target_concept_id: UUID | None = None
+    path: list[LearningPathNodeResponse]
+    frontier: list[RecommendationResponse]
+    coverage: dict[str, dict] = Field(default_factory=dict)
+
+
+class SkillEntry(BaseModel):
+    skill: str
+    proficiency: float
+
+
+class SkillProfileResponse(BaseModel):
+    skill_profile: dict[str, float]
+    top_skills: list[SkillEntry]
+    bloom_distribution: dict[str, int]

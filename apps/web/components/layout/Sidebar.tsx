@@ -11,9 +11,11 @@ import {
   GitBranch,
   LayoutDashboard,
   Lightbulb,
+  Map,
   MessageSquare,
   Network,
   Settings,
+  Sparkles,
   User,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
@@ -33,6 +35,8 @@ const learningNavItems = [
   { href: '/student/mastery', icon: BarChart3, label: 'Mastery' },
   { href: '/student/gaps', icon: AlertTriangle, label: 'Weak Areas' },
   { href: '/student/recommendations', icon: Lightbulb, label: 'Next Up' },
+  { href: '/student/learning-path', icon: Map, label: 'Learning Path' },
+  { href: '/student/skills', icon: Sparkles, label: 'Skills' },
   { href: '/student/graph', icon: Network, label: 'Knowledge Map' },
   { href: '/student/timeline', icon: GitBranch, label: 'Timeline' },
   { href: '/student/statistics', icon: BarChart3, label: 'Statistics' },

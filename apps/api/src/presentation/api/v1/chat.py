@@ -9,10 +9,12 @@ from src.application.dtos.user import UserResponse
 from src.application.interfaces.dependencies import (
     get_chat_service,
     get_current_user,
+    get_intent_engine,
     get_learning_orchestrator,
     get_user_service,
 )
 from src.application.services.chat_service import ChatService
+from src.application.services.intent_engine import IntentEngine
 from src.application.services.learning_orchestrator import LearningOrchestrator
 from src.application.services.user_service import UserService
 from src.presentation.api.response import ok, paginated
@@ -29,6 +31,7 @@ async def send_message(
     chat_svc: Annotated[ChatService, Depends(get_chat_service)],
     user_svc: Annotated[UserService, Depends(get_user_service)],
     orchestrator: Annotated[LearningOrchestrator, Depends(get_learning_orchestrator)],
+    intent_engine: Annotated[IntentEngine, Depends(get_intent_engine)],
 ) -> StreamingResponse:
     user_settings = await user_svc.get_settings(UUID(current_user.id))
     collected_response: list[str] = []
@@ -36,12 +39,16 @@ async def send_message(
     question = body.message
     conversation_id = body.conversation_id
 
+    # Classify intent synchronously before streaming — used in system prompt and session record
+    current_intent = intent_engine.classify(question)
+
     async def event_stream():
         async for chunk in chat_svc.stream_response(
             user_id=user_id,
             dto=body,
             llm_model=user_settings.llm_model,
             temperature=user_settings.temperature,
+            current_intent=current_intent,
         ):
             collected_response.append(chunk)
             yield chunk
@@ -53,6 +60,7 @@ async def send_message(
             question=question,
             ai_response=ai_text,
             conversation_id=conversation_id,
+            intent=current_intent,
         )
 
     background_tasks.add_task(run_learning_pipeline)

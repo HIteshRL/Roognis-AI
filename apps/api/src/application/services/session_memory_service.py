@@ -24,6 +24,7 @@ class SessionMemoryService:
         chapter: str | None = None,
         grade: str | None = None,
         retrieved_context: str | None = None,
+        intent: str = "unknown",
         token_count: int = 0,
         duration_ms: int = 0,
     ) -> LearningSession:
@@ -42,6 +43,7 @@ class SessionMemoryService:
             bloom_level=extraction.bloom_level,
             difficulty_level=extraction.difficulty,
             misconceptions=extraction.misconceptions,
+            intent=intent,
             token_count=token_count,
             duration_ms=duration_ms,
         )

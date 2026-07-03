@@ -62,6 +62,7 @@ class LearningSessionModel(Base, UUIDMixin):
     bloom_level: Mapped[str] = mapped_column(String(20), nullable=False, default="Understand")
     difficulty_level: Mapped[str] = mapped_column(String(10), nullable=False, default="medium")
     misconceptions: Mapped[list] = mapped_column(JSONB, nullable=True, default=list)
+    intent: Mapped[str] = mapped_column(String(30), nullable=False, default="unknown")
     token_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     duration_ms: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     created_at: Mapped[datetime] = mapped_column(
@@ -144,6 +145,35 @@ class MasteryRecordModel(Base, UUIDMixin):
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )
     created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+
+class ConceptMemoryModel(Base, UUIDMixin):
+    __tablename__ = "concept_memory"
+    __table_args__ = (UniqueConstraint("user_id", "concept_id"),)
+
+    user_id: Mapped[str] = mapped_column(
+        UUID(as_uuid=False), ForeignKey("users.id", ondelete="CASCADE"),
+        nullable=False, index=True,
+    )
+    concept_id: Mapped[str] = mapped_column(
+        UUID(as_uuid=False), ForeignKey("concept_nodes.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    concept_name: Mapped[str] = mapped_column(String(200), nullable=False)
+    times_taught: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    successful_approaches: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    failed_approaches: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    last_approach: Mapped[str | None] = mapped_column(String(30), nullable=True)
+    teaching_notes: Mapped[list] = mapped_column(JSONB, nullable=True, default=list)
+    last_taught: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+    updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )
 

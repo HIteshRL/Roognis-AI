@@ -12,8 +12,10 @@ from src.application.dtos.user import UserResponse
 from src.application.services.auth_service import AuthService
 from src.application.services.chat_service import ChatService
 from src.application.services.concept_extraction_service import ConceptExtractionService
+from src.application.services.concept_memory_service import ConceptMemoryService
 from src.application.services.context_validation_service import ContextValidationService
 from src.application.services.document_service import DocumentService
+from src.application.services.intent_engine import IntentEngine
 from src.application.services.knowledge_graph_service import KnowledgeGraphService
 from src.application.services.knowledge_library_service import KnowledgeLibraryService
 from src.application.services.learner_behavior_service import LearnerBehaviorService
@@ -21,6 +23,7 @@ from src.application.services.learner_context_service import LearnerContextServi
 from src.application.services.learning_analytics_service import LearningAnalyticsService
 from src.application.services.learning_gap_detector import LearningGapDetector
 from src.application.services.learning_orchestrator import LearningOrchestrator
+from src.application.services.learning_path_service import LearningPathService
 from src.application.services.learning_velocity_service import LearningVelocityService
 from src.application.services.mastery_engine import MasteryEngine
 from src.application.services.next_best_topic_engine import NextBestTopicEngine
@@ -30,6 +33,7 @@ from src.application.services.response_cache_service import ResponseCacheService
 from src.application.services.retrieval_service import RetrievalService
 from src.application.services.search_service import SearchService
 from src.application.services.session_memory_service import SessionMemoryService
+from src.application.services.skill_graph_service import SkillGraphService
 from src.application.services.student_profile_service import StudentProfileService
 from src.application.services.user_service import UserService
 from src.application.services.vector_service import VectorService
@@ -48,6 +52,7 @@ from src.infrastructure.database.repositories.knowledge_repository import (
 )
 from src.infrastructure.database.repositories.learning_repository import (
     ConceptEdgeRepository,
+    ConceptMemoryRepository,
     ConceptNodeRepository,
     LearningGapRepository,
     LearningSessionRepository,
@@ -146,10 +151,15 @@ def get_chat_service(
         prompt_assembly_svc = None
         context_validation_svc = None
 
+    concept_memory_svc = ConceptMemoryService(
+        memory_repo=ConceptMemoryRepository(db),
+        concept_repo=ConceptNodeRepository(db),
+    )
     learner_context_svc = LearnerContextService(
         profile_repo=StudentProfileRepository(db),
         mastery_repo=MasteryRepository(db),
         gap_repo=LearningGapRepository(db),
+        concept_memory_svc=concept_memory_svc,
     )
 
     return ChatService(
@@ -256,7 +266,6 @@ def get_learning_orchestrator(
     from groq import AsyncGroq
 
     node_repo = ConceptNodeRepository(db)
-    edge_repo = ConceptEdgeRepository(db)
     mastery_repo = MasteryRepository(db)
     gap_repo = LearningGapRepository(db)
     session_repo = LearningSessionRepository(db)
@@ -271,6 +280,10 @@ def get_learning_orchestrator(
     behavior_svc = LearnerBehaviorService(
         session_repo=session_repo, mastery_repo=mastery_repo, gap_repo=gap_repo,
     )
+    concept_memory_svc = ConceptMemoryService(
+        memory_repo=ConceptMemoryRepository(db),
+        concept_repo=node_repo,
+    )
 
     return LearningOrchestrator(
         extractor=extractor,
@@ -280,6 +293,7 @@ def get_learning_orchestrator(
         gap_detector=gap_detector,
         velocity_svc=velocity_svc,
         behavior_svc=behavior_svc,
+        concept_memory_svc=concept_memory_svc,
     )
 
 
@@ -355,3 +369,33 @@ def get_learning_analytics_service(
         gap_repo=LearningGapRepository(db),
         velocity_svc=LearningVelocityService(session_repo=session_repo, mastery_repo=mastery_repo),
     )
+
+
+def get_intent_engine() -> IntentEngine:
+    return IntentEngine()
+
+
+def get_concept_memory_service(
+    db: Annotated[AsyncSession, Depends(get_db)],
+) -> ConceptMemoryService:
+    return ConceptMemoryService(
+        memory_repo=ConceptMemoryRepository(db),
+        concept_repo=ConceptNodeRepository(db),
+    )
+
+
+def get_learning_path_service(
+    db: Annotated[AsyncSession, Depends(get_db)],
+) -> LearningPathService:
+    return LearningPathService(
+        graph=KnowledgeGraphService(
+            node_repo=ConceptNodeRepository(db),
+            edge_repo=ConceptEdgeRepository(db),
+        ),
+        mastery_repo=MasteryRepository(db),
+        profile_repo=StudentProfileRepository(db),
+    )
+
+
+def get_skill_graph_service() -> SkillGraphService:
+    return SkillGraphService()

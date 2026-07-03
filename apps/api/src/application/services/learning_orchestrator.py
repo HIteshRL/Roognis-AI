@@ -9,6 +9,7 @@ import structlog
 
 from src.application.dtos.learning import ConceptExtractionResult
 from src.application.services.concept_extraction_service import ConceptExtractionService
+from src.application.services.concept_memory_service import ConceptMemoryService
 from src.application.services.learner_behavior_service import LearnerBehaviorService
 from src.application.services.learning_gap_detector import LearningGapDetector
 from src.application.services.learning_velocity_service import LearningVelocityService
@@ -29,6 +30,7 @@ class LearningOrchestrator:
         gap_detector: LearningGapDetector,
         velocity_svc: LearningVelocityService | None = None,
         behavior_svc: LearnerBehaviorService | None = None,
+        concept_memory_svc: ConceptMemoryService | None = None,
     ) -> None:
         self._extractor = extractor
         self._profiles = profile_svc
@@ -37,6 +39,7 @@ class LearningOrchestrator:
         self._gaps = gap_detector
         self._velocity = velocity_svc
         self._behavior = behavior_svc
+        self._concept_memory = concept_memory_svc
 
     async def process(
         self,
@@ -48,6 +51,7 @@ class LearningOrchestrator:
         chapter: str | None = None,
         grade: str | None = None,
         retrieved_context: str | None = None,
+        intent: str = "unknown",
         token_count: int = 0,
         duration_ms: int = 0,
     ) -> None:
@@ -63,7 +67,7 @@ class LearningOrchestrator:
             await self._profiles.get_or_create(user_id)
             await self._profiles.touch(user_id)
 
-            # Record the learning session
+            # Record the learning session (includes classified intent)
             await self._sessions.record(
                 user_id=user_id,
                 question=question,
@@ -74,6 +78,7 @@ class LearningOrchestrator:
                 chapter=chapter,
                 grade=grade,
                 retrieved_context=retrieved_context,
+                intent=intent,
                 token_count=token_count,
                 duration_ms=duration_ms,
             )
@@ -112,6 +117,16 @@ class LearningOrchestrator:
             if self._behavior:
                 signals = await self._behavior.compute(user_id)
                 await self._profiles.update_behavioral_signals(user_id, signals)
+
+            # Update per-concept teaching memory
+            if self._concept_memory:
+                await self._concept_memory.record_from_extraction(
+                    user_id=user_id,
+                    extraction=extraction,
+                    subject=subject,
+                    grade=grade,
+                    chapter=chapter,
+                )
 
             logger.info(
                 "learning_pipeline_complete",

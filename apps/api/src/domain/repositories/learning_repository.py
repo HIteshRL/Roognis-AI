@@ -4,6 +4,7 @@ from uuid import UUID
 
 from src.domain.entities.learning import (
     ConceptEdge,
+    ConceptMemory,
     ConceptNode,
     LearningGap,
     LearningSession,
@@ -105,3 +106,17 @@ class AbstractLearningGapRepository(ABC):
 
     @abstractmethod
     async def resolve(self, gap_id: UUID) -> None: ...
+
+
+class AbstractConceptMemoryRepository(ABC):
+    @abstractmethod
+    async def get_or_create(self, user_id: UUID, concept_id: UUID, concept_name: str) -> ConceptMemory: ...
+
+    @abstractmethod
+    async def update(self, memory: ConceptMemory) -> ConceptMemory: ...
+
+    @abstractmethod
+    async def list_by_user(self, user_id: UUID) -> list[ConceptMemory]: ...
+
+    @abstractmethod
+    async def get_by_concept(self, user_id: UUID, concept_id: UUID) -> ConceptMemory | None: ...

@@ -24,13 +24,23 @@ logger = structlog.get_logger(__name__)
 _MAX_WEAK_CONCEPTS = 5
 _MAX_ACTIVE_GAPS = 5
 _MAX_STRENGTHS = 3
+_MAX_STRUGGLING_CONCEPTS = 3
+
+_INTENT_INSTRUCTIONS: dict[str, str] = {
+    "concept_explanation": "The student wants to understand a concept — start with the core principle, then build up.",
+    "problem_solving": "The student wants to solve a problem — walk through the method step by step.",
+    "clarification": "The student is confused by something previously explained — try a different angle or a concrete example.",
+    "recall": "The student is asking a factual question — give a direct, concise answer then briefly explain why it matters.",
+    "test_prep": "The student is preparing for an exam — include practice-style tips, key points to remember, and common mistakes to avoid.",
+    "correction_request": "The student believes something is incorrect — acknowledge their perspective, then carefully clarify or confirm the correct answer.",
+}
 
 
 class LearnerContextService:
     """
     Reads StudentProfile (including behavioral_signals), weakest mastery
-    records, and active learning gaps, then renders a structured context
-    block with explicit adaptation instructions for the LLM.
+    records, active learning gaps, and concept teaching memory, then renders
+    a structured context block with explicit adaptation instructions for the LLM.
     """
 
     def __init__(
@@ -38,12 +48,14 @@ class LearnerContextService:
         profile_repo: AbstractStudentProfileRepository,
         mastery_repo: AbstractMasteryRepository,
         gap_repo: AbstractLearningGapRepository,
+        concept_memory_svc=None,   # ConceptMemoryService | None — optional to avoid circular import
     ) -> None:
         self._profiles = profile_repo
         self._mastery = mastery_repo
         self._gaps = gap_repo
+        self._concept_memory = concept_memory_svc
 
-    async def build(self, user_id: UUID) -> str | None:
+    async def build(self, user_id: UUID, current_intent: str = "unknown") -> str | None:
         profile = await self._profiles.get_by_user_id(user_id)
         if not profile:
             return None
@@ -66,8 +78,14 @@ class LearnerContextService:
         if knowledge:
             sections.append(knowledge)
 
-        # ── Section 4: Adaptation Instructions ───────────────────────────
-        instructions = self._build_adaptation_instructions(profile, bs)
+        # ── Section 4: Teaching History (Phase 0.5) ──────────────────────
+        if self._concept_memory:
+            teaching_history = await self._build_teaching_history(user_id)
+            if teaching_history:
+                sections.append(teaching_history)
+
+        # ── Section 5: Adaptation Instructions ───────────────────────────
+        instructions = self._build_adaptation_instructions(profile, bs, current_intent)
         sections.append(instructions)
 
         if len(sections) <= 1:
@@ -161,8 +179,28 @@ class LearnerContextService:
 
         return "\n".join(lines) if len(lines) > 1 else ""
 
+    async def _build_teaching_history(self, user_id: UUID) -> str:
+        try:
+            all_memories = await self._concept_memory.get_struggling_concepts(user_id)
+        except Exception:
+            return ""
+        if not all_memories:
+            return ""
+
+        lines: list[str] = ["### Teaching History"]
+        for mem in all_memories[:_MAX_STRUGGLING_CONCEPTS]:
+            rate = int(mem.success_rate * 100)
+            line = (
+                f"- {mem.concept_name}: explained {mem.times_taught}x, "
+                f"{rate}% success — try a completely different approach"
+            )
+            if mem.teaching_notes:
+                line += f" (recurring confusion: \"{mem.teaching_notes[-1]}\")"
+            lines.append(line)
+        return "\n".join(lines) if len(lines) > 1 else ""
+
     @staticmethod
-    def _build_adaptation_instructions(profile, bs: BehavioralSignals) -> str:
+    def _build_adaptation_instructions(profile, bs: BehavioralSignals, current_intent: str = "unknown") -> str:
         lines: list[str] = ["### How to Teach This Student"]
 
         if bs.response_pattern == "procedural":
@@ -190,6 +228,10 @@ class LearnerContextService:
 
         if bs.total_misconceptions > 0:
             lines.append("- Check for known misconceptions before accepting their reasoning")
+
+        # Current session intent instruction
+        if current_intent in _INTENT_INSTRUCTIONS:
+            lines.append(f"- Current question intent: {_INTENT_INSTRUCTIONS[current_intent]}")
 
         lines.append("- Do not mention this profile or any internal system context to the student")
 

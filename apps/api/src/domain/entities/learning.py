@@ -114,6 +114,7 @@ class LearningSession:
     bloom_level: str = "Understand"
     difficulty_level: str = "medium"   # low | medium | high
     misconceptions: list[str] = field(default_factory=list)
+    intent: str = "unknown"            # concept_explanation | problem_solving | clarification | recall | test_prep | correction_request
     token_count: int = 0
     duration_ms: int = 0
     created_at: datetime = field(default_factory=lambda: datetime.now(UTC))
@@ -212,3 +213,42 @@ class LearningGap:
     def resolve(self) -> None:
         self.is_resolved = True
         self.updated_at = datetime.now(UTC)
+
+
+@dataclass
+class ConceptMemory:
+    """Per-concept pedagogical teaching history stored across sessions.
+    Enables the LLM to know which approaches worked and what misconceptions recur."""
+    user_id: UUID
+    concept_id: UUID
+    concept_name: str
+    id: UUID = field(default_factory=uuid4)
+    times_taught: int = 0
+    successful_approaches: int = 0
+    failed_approaches: int = 0
+    last_approach: str | None = None      # procedural | conceptual | example-first
+    teaching_notes: list[str] = field(default_factory=list)   # recurring misconception phrases
+    last_taught: datetime = field(default_factory=lambda: datetime.now(UTC))
+    created_at: datetime = field(default_factory=lambda: datetime.now(UTC))
+    updated_at: datetime = field(default_factory=lambda: datetime.now(UTC))
+
+    def record_interaction(self, approach: str, had_misconception: bool, note: str | None = None) -> None:
+        self.times_taught += 1
+        self.last_approach = approach
+        self.last_taught = datetime.now(UTC)
+        self.updated_at = datetime.now(UTC)
+        if had_misconception:
+            self.failed_approaches += 1
+            if note and note not in self.teaching_notes:
+                self.teaching_notes = (self.teaching_notes + [note])[-5:]
+        else:
+            self.successful_approaches += 1
+
+    @property
+    def success_rate(self) -> float:
+        total = self.successful_approaches + self.failed_approaches
+        return round(self.successful_approaches / total, 2) if total > 0 else 0.0
+
+    @property
+    def needs_different_approach(self) -> bool:
+        return self.times_taught >= 3 and self.success_rate < 0.5

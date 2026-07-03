@@ -7,6 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from src.domain.entities.learning import (
     BehavioralSignals,
     ConceptEdge,
+    ConceptMemory,
     ConceptNode,
     LearningGap,
     LearningSession,
@@ -15,6 +16,7 @@ from src.domain.entities.learning import (
 )
 from src.domain.repositories.learning_repository import (
     AbstractConceptEdgeRepository,
+    AbstractConceptMemoryRepository,
     AbstractConceptNodeRepository,
     AbstractLearningGapRepository,
     AbstractLearningSessionRepository,
@@ -23,6 +25,7 @@ from src.domain.repositories.learning_repository import (
 )
 from src.infrastructure.database.models.learning import (
     ConceptEdgeModel,
+    ConceptMemoryModel,
     ConceptNodeModel,
     LearningGapModel,
     LearningSessionModel,
@@ -66,6 +69,7 @@ def _to_session(m: LearningSessionModel) -> LearningSession:
     s.bloom_level = m.bloom_level
     s.difficulty_level = m.difficulty_level
     s.misconceptions = list(m.misconceptions or [])
+    s.intent = getattr(m, "intent", "unknown")
     s.token_count = m.token_count
     s.duration_ms = m.duration_ms
     s.created_at = m.created_at
@@ -207,6 +211,7 @@ class LearningSessionRepository(AbstractLearningSessionRepository):
             bloom_level=session.bloom_level,
             difficulty_level=session.difficulty_level,
             misconceptions=session.misconceptions,
+            intent=session.intent,
             token_count=session.token_count,
             duration_ms=session.duration_ms,
         )
@@ -515,3 +520,86 @@ class LearningGapRepository(AbstractLearningGapRepository):
             m.is_resolved = True
             m.updated_at = datetime.now(UTC)
             await self._db.flush()
+
+
+# ── Concept Memory ────────────────────────────────────────────────────────────
+
+def _to_memory(m: ConceptMemoryModel) -> ConceptMemory:
+    c = ConceptMemory.__new__(ConceptMemory)
+    c.id = UUID(m.id)
+    c.user_id = UUID(m.user_id)
+    c.concept_id = UUID(m.concept_id)
+    c.concept_name = m.concept_name
+    c.times_taught = m.times_taught
+    c.successful_approaches = m.successful_approaches
+    c.failed_approaches = m.failed_approaches
+    c.last_approach = m.last_approach
+    c.teaching_notes = list(m.teaching_notes or [])
+    c.last_taught = m.last_taught
+    c.created_at = m.created_at
+    c.updated_at = m.updated_at
+    return c
+
+
+class ConceptMemoryRepository(AbstractConceptMemoryRepository):
+    def __init__(self, db: AsyncSession) -> None:
+        self._db = db
+
+    async def get_or_create(
+        self, user_id: UUID, concept_id: UUID, concept_name: str
+    ) -> ConceptMemory:
+        result = await self._db.execute(
+            select(ConceptMemoryModel).where(
+                ConceptMemoryModel.user_id == str(user_id),
+                ConceptMemoryModel.concept_id == str(concept_id),
+            )
+        )
+        m = result.scalar_one_or_none()
+        if m:
+            return _to_memory(m)
+
+        from uuid import uuid4
+        m = ConceptMemoryModel(
+            id=str(uuid4()),
+            user_id=str(user_id),
+            concept_id=str(concept_id),
+            concept_name=concept_name,
+        )
+        self._db.add(m)
+        await self._db.flush()
+        await self._db.refresh(m)
+        return _to_memory(m)
+
+    async def update(self, memory: ConceptMemory) -> ConceptMemory:
+        result = await self._db.execute(
+            select(ConceptMemoryModel).where(ConceptMemoryModel.id == str(memory.id))
+        )
+        m = result.scalar_one()
+        m.times_taught = memory.times_taught
+        m.successful_approaches = memory.successful_approaches
+        m.failed_approaches = memory.failed_approaches
+        m.last_approach = memory.last_approach
+        m.teaching_notes = memory.teaching_notes
+        m.last_taught = memory.last_taught
+        m.updated_at = memory.updated_at
+        await self._db.flush()
+        await self._db.refresh(m)
+        return _to_memory(m)
+
+    async def list_by_user(self, user_id: UUID) -> list[ConceptMemory]:
+        result = await self._db.execute(
+            select(ConceptMemoryModel)
+            .where(ConceptMemoryModel.user_id == str(user_id))
+            .order_by(ConceptMemoryModel.times_taught.desc())
+        )
+        return [_to_memory(m) for m in result.scalars().all()]
+
+    async def get_by_concept(self, user_id: UUID, concept_id: UUID) -> ConceptMemory | None:
+        result = await self._db.execute(
+            select(ConceptMemoryModel).where(
+                ConceptMemoryModel.user_id == str(user_id),
+                ConceptMemoryModel.concept_id == str(concept_id),
+            )
+        )
+        m = result.scalar_one_or_none()
+        return _to_memory(m) if m else None

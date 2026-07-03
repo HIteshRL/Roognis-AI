@@ -1,32 +1,41 @@
 from typing import Annotated
 from uuid import UUID
 
-from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query, Request, status
+from fastapi import APIRouter, Depends, Query, Request
 
 from src.application.dtos.learning import (
     BehavioralSignalsResponse,
-    LearningAnalyticsResponse,
+    ConceptMemoryResponse,
+    LearningPathNodeResponse,
+    LearningPathResponse,
     MasteryRecordResponse,
     RecommendationResponse,
-    SessionListResponse,
+    SkillEntry,
+    SkillProfileResponse,
     StudentProfileResponse,
     UpdateProfileRequest,
 )
 from src.application.dtos.user import UserResponse
 from src.application.interfaces.dependencies import (
+    get_concept_memory_service,
     get_current_user,
     get_learning_analytics_service,
     get_learning_gap_detector,
+    get_learning_path_service,
     get_mastery_engine,
     get_next_best_topic_engine,
     get_session_memory_service,
+    get_skill_graph_service,
     get_student_profile_service,
 )
+from src.application.services.concept_memory_service import ConceptMemoryService
 from src.application.services.learning_analytics_service import LearningAnalyticsService
 from src.application.services.learning_gap_detector import LearningGapDetector
+from src.application.services.learning_path_service import LearningPathService
 from src.application.services.mastery_engine import MasteryEngine
 from src.application.services.next_best_topic_engine import NextBestTopicEngine
 from src.application.services.session_memory_service import SessionMemoryService
+from src.application.services.skill_graph_service import SkillGraphService
 from src.application.services.student_profile_service import StudentProfileService
 from src.presentation.api.response import ok, paginated
 
@@ -118,6 +127,7 @@ async def list_sessions(
                 "bloom_level": s.bloom_level,
                 "difficulty_level": s.difficulty_level,
                 "misconceptions": s.misconceptions,
+                "intent": s.intent,
                 "token_count": s.token_count,
                 "duration_ms": s.duration_ms,
                 "created_at": s.created_at.isoformat(),
@@ -215,6 +225,107 @@ async def get_recommendations(
             ).model_dump(mode="json")
             for r in recs
         ],
+        request_id=request.state.request_id,
+    )
+
+
+@router.get("/memory", response_model=None)
+async def get_concept_memory(
+    request: Request,
+    current_user: Annotated[UserResponse, Depends(get_current_user)],
+    memory_svc: Annotated[ConceptMemoryService, Depends(get_concept_memory_service)],
+):
+    memories = await memory_svc.get_all(UUID(current_user.id))
+    return ok(
+        [
+            ConceptMemoryResponse(
+                id=m.id,
+                concept_id=m.concept_id,
+                concept_name=m.concept_name,
+                times_taught=m.times_taught,
+                successful_approaches=m.successful_approaches,
+                failed_approaches=m.failed_approaches,
+                last_approach=m.last_approach,
+                teaching_notes=m.teaching_notes,
+                success_rate=m.success_rate,
+                needs_different_approach=m.needs_different_approach,
+                last_taught=m.last_taught,
+            ).model_dump(mode="json")
+            for m in memories
+        ],
+        request_id=request.state.request_id,
+    )
+
+
+@router.get("/learning-path", response_model=None)
+async def get_learning_path(
+    request: Request,
+    current_user: Annotated[UserResponse, Depends(get_current_user)],
+    path_svc: Annotated[LearningPathService, Depends(get_learning_path_service)],
+    target_concept_id: Annotated[UUID | None, Query()] = None,
+):
+    user_id = UUID(current_user.id)
+    frontier = await path_svc.get_frontier(user_id)
+    coverage = await path_svc.curriculum_coverage(user_id)
+
+    path_nodes = []
+    if target_concept_id:
+        nodes = await path_svc.path_to_concept(user_id, target_concept_id)
+        path_nodes = [
+            LearningPathNodeResponse(
+                concept_id=n.id,
+                concept_name=n.name,
+                subject=n.subject,
+                chapter=n.chapter,
+                bloom_level=n.bloom_level,
+                difficulty=n.difficulty,
+            ).model_dump(mode="json")
+            for n in nodes
+        ]
+
+    return ok(
+        LearningPathResponse(
+            target_concept_id=target_concept_id,
+            path=path_nodes,
+            frontier=[
+                RecommendationResponse(
+                    concept_id=r.concept_id,
+                    concept_name=r.concept_name,
+                    subject=r.subject,
+                    chapter=r.chapter,
+                    reason=r.reason,
+                    readiness_score=r.readiness_score,
+                )
+                for r in frontier
+            ],
+            coverage=coverage,
+        ).model_dump(mode="json"),
+        request_id=request.state.request_id,
+    )
+
+
+@router.get("/skills", response_model=None)
+async def get_skill_profile(
+    request: Request,
+    current_user: Annotated[UserResponse, Depends(get_current_user)],
+    mastery_engine: Annotated[MasteryEngine, Depends(get_mastery_engine)],
+    session_svc: Annotated[SessionMemoryService, Depends(get_session_memory_service)],
+    skill_svc: Annotated[SkillGraphService, Depends(get_skill_graph_service)],
+):
+    user_id = UUID(current_user.id)
+    mastery_records = await mastery_engine.get_all(user_id)
+    sessions, _ = await session_svc.list_sessions(user_id, limit=50, offset=0)
+
+    profile = skill_svc.build_student_skill_profile(mastery_records, sessions)
+    top = skill_svc.top_skills(profile, n=5)
+    bloom_dist = skill_svc.categorize_bloom_distribution(sessions)
+
+    return ok(
+        SkillProfileResponse(
+            skill_profile=profile,
+            top_skills=[SkillEntry(skill=s["skill"], proficiency=s["proficiency"]) for s in top],
+            bloom_distribution=bloom_dist,
+        ).model_dump(mode="json"),
         request_id=request.state.request_id,
     )
 

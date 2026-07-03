@@ -50,9 +50,51 @@ export interface LearningSession {
   bloom_level: string
   difficulty_level: string
   misconceptions: string[]
+  intent: 'concept_explanation' | 'problem_solving' | 'clarification' | 'recall' | 'test_prep' | 'correction_request' | 'unknown'
   token_count: number
   duration_ms: number
   created_at: string
+}
+
+export interface ConceptMemory {
+  id: string
+  concept_id: string
+  concept_name: string
+  times_taught: number
+  successful_approaches: number
+  failed_approaches: number
+  last_approach: string | null
+  teaching_notes: string[]
+  success_rate: number
+  needs_different_approach: boolean
+  last_taught: string
+}
+
+export interface LearningPathNode {
+  concept_id: string
+  concept_name: string
+  subject: string | null
+  chapter: string | null
+  bloom_level: string
+  difficulty: string
+}
+
+export interface LearningPath {
+  target_concept_id: string | null
+  path: LearningPathNode[]
+  frontier: Recommendation[]
+  coverage: Record<string, { total: number; mastered: number; coverage_pct: number }>
+}
+
+export interface SkillEntry {
+  skill: string
+  proficiency: number
+}
+
+export interface SkillProfile {
+  skill_profile: Record<string, number>
+  top_skills: SkillEntry[]
+  bloom_distribution: Record<string, number>
 }
 
 export interface MasteryRecord {
@@ -142,4 +184,13 @@ export const studentApi = {
     apiClient.get<Recommendation[]>('/api/v1/student/recommendations'),
 
   getAnalytics: () => apiClient.get<LearningAnalytics>('/api/v1/student/analytics'),
+
+  getConceptMemory: () => apiClient.get<ConceptMemory[]>('/api/v1/student/memory'),
+
+  getLearningPath: (targetConceptId?: string) =>
+    apiClient.get<LearningPath>(
+      `/api/v1/student/learning-path${targetConceptId ? `?target_concept_id=${targetConceptId}` : ''}`
+    ),
+
+  getSkillProfile: () => apiClient.get<SkillProfile>('/api/v1/student/skills'),
 }

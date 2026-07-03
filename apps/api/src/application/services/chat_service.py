@@ -56,6 +56,7 @@ class ChatService:
         dto: SendMessageRequest,
         llm_model: str,
         temperature: float,
+        current_intent: str = "unknown",
     ) -> AsyncGenerator[str, None]:
         conversation = await self._get_or_create_conversation(user_id, dto.conversation_id)
 
@@ -81,7 +82,7 @@ class ChatService:
         learner_context: str | None = None
         if self._learner_context:
             try:
-                learner_context = await self._learner_context.build(user_id)
+                learner_context = await self._learner_context.build(user_id, current_intent=current_intent)
             except Exception as exc:
                 logger.warning("learner_context_build_failed", error=str(exc), user_id=str(user_id))
 

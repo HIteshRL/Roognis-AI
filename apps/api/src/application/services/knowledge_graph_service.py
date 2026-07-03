@@ -60,3 +60,57 @@ class KnowledgeGraphService:
             return 1.0
         ready = sum(1 for p in prereqs if mastery_map.get(p.id, 0.0) >= 70)
         return round(ready / len(prereqs), 3)
+
+    async def get_all_prerequisites(self, concept_id: UUID) -> list[ConceptNode]:
+        """BFS to get all transitive prerequisites of a concept."""
+        visited: set[UUID] = set()
+        queue: list[UUID] = [concept_id]
+        result: list[ConceptNode] = []
+        while queue:
+            cid = queue.pop(0)
+            if cid in visited:
+                continue
+            visited.add(cid)
+            prereqs = await self._edges.get_prerequisites(cid)
+            for p in prereqs:
+                if p.id not in visited:
+                    result.append(p)
+                    queue.append(p.id)
+        return result
+
+    async def learning_order(self, concept_ids: list[UUID]) -> list[UUID]:
+        """
+        Returns concept_ids in topological order (prerequisites before dependents).
+        Uses a simple in-degree BFS (Kahn's algorithm) within the given set.
+        """
+        if not concept_ids:
+            return []
+
+        id_set = set(concept_ids)
+        # Build adjacency and in-degree within the subgraph
+        in_degree: dict[UUID, int] = {cid: 0 for cid in concept_ids}
+        graph: dict[UUID, list[UUID]] = {cid: [] for cid in concept_ids}
+
+        for cid in concept_ids:
+            prereqs = await self._edges.get_prerequisites(cid)
+            for p in prereqs:
+                if p.id in id_set:
+                    graph[p.id].append(cid)  # p must come before cid
+                    in_degree[cid] += 1
+
+        queue = [cid for cid, deg in in_degree.items() if deg == 0]
+        order: list[UUID] = []
+        while queue:
+            node = queue.pop(0)
+            order.append(node)
+            for successor in graph[node]:
+                in_degree[successor] -= 1
+                if in_degree[successor] == 0:
+                    queue.append(successor)
+
+        # Append any remaining (cycles or disconnected) in original order
+        appended = set(order)
+        for cid in concept_ids:
+            if cid not in appended:
+                order.append(cid)
+        return order
