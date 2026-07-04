@@ -64,7 +64,18 @@ _pwd = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
 DEMO_PASSWORD = "Demo1234!"
 DEMO_JOIN_CODE = "DEMO24"
-DEMO_STUDENT_EMAIL = "student@demo.roognis.ai"
+DEMO_STUDENT_EMAIL = "kid1@demo.roognis.ai"
+
+# Five demo students for the classroom (username, email tag, target avg mastery
+# 0-100 or None for a brand-new kid with no records yet). Spread across the
+# mastery buckets so the teacher dashboard shows a realistic distribution.
+DEMO_KIDS = [
+    ("aarav", "kid1", 88),   # mastered
+    ("diya", "kid2", 72),    # proficient
+    ("kabir", "kid3", 48),   # developing
+    ("meera", "kid4", 24),   # struggling
+    ("rohan", "kid5", None),  # just joined — no mastery yet
+]
 
 PROMPT_TEMPLATES = [
     {
@@ -131,10 +142,6 @@ async def seed_demo(db) -> None:
         return
 
     ph = _pwd.hash(DEMO_PASSWORD)
-    student = await users.create(
-        User(email=DEMO_STUDENT_EMAIL, username="demo_student",
-             password_hash=ph, role=Role.STUDENT, is_verified=True)
-    )
     teacher = await users.create(
         User(email="teacher@demo.roognis.ai", username="demo_teacher",
              password_hash=ph, role=Role.TEACHER, is_verified=True)
@@ -144,18 +151,7 @@ async def seed_demo(db) -> None:
              password_hash=ph, role=Role.PARENT, is_verified=True)
     )
 
-    signals = BehavioralSignals(
-        engagement_streak=4, total_sessions=len(DEMO_SESSIONS),
-        dominant_subject="Mathematics", strengths=["Fractions"],
-    )
-    await StudentProfileRepository(db).create(
-        StudentProfile(
-            user_id=student.id, grade="8", subjects=["Mathematics"],
-            current_chapter="Fractions & Decimals", behavioral_signals=signals,
-            learning_velocity=6.2, confidence_score=0.62,
-        )
-    )
-
+    # School + classroom + published syllabus (owned by the teacher).
     school = await SchoolRepository(db).create(
         School(name="Demo Public School", slug="demo-public-school", created_by=teacher.id)
     )
@@ -166,9 +162,6 @@ async def seed_demo(db) -> None:
         Classroom(school_id=school.id, name="Grade 8 Mathematics", subject="Mathematics",
                   grade="8", teacher_id=teacher.id, join_code=DEMO_JOIN_CODE)
     )
-    await EnrollmentRepository(db).create(
-        Enrollment(classroom_id=classroom.id, student_id=student.id)
-    )
     syllabus = SyllabusRepository(db)
     for i, chapter in enumerate(["Fractions", "Decimals", "Ratios & Proportions"]):
         await syllabus.create(
@@ -176,10 +169,7 @@ async def seed_demo(db) -> None:
                          chapter=chapter, order_index=i, is_published=True)
         )
 
-    await GuardianRepository(db).create(
-        GuardianLink(parent_id=parent.id, student_id=student.id)
-    )
-
+    # Shared concept graph (created once, referenced by every kid's mastery).
     nodes_repo, edges_repo = ConceptNodeRepository(db), ConceptEdgeRepository(db)
     nodes = {}
     for name, _ in DEMO_CONCEPTS:
@@ -187,43 +177,75 @@ async def seed_demo(db) -> None:
     for src, tgt in DEMO_PREREQS:
         await edges_repo.create(ConceptEdge(source_id=nodes[src].id, target_id=nodes[tgt].id))
 
+    profiles = StudentProfileRepository(db)
+    enrollments = EnrollmentRepository(db)
     mastery_repo = MasteryRepository(db)
-    for name, score in DEMO_CONCEPTS:
-        rec = await mastery_repo.get_or_create(student.id, nodes[name].id, name)
-        rec.score = float(score)
-        rec.interaction_count = 3
-        await mastery_repo.update(rec)
-
     gap_repo = LearningGapRepository(db)
-    g1 = await gap_repo.get_or_create(
-        student.id, nodes["Proportions"].id, "Proportions",
-        "Confuses ratio direction when setting up proportions",
-    )
-    g1.severity, g1.confidence, g1.occurrence_count = "high", "high", 3
-    await gap_repo.update(g1)
-    await gap_repo.get_or_create(
-        student.id, nodes["Percentages"].id, "Percentages",
-        "Struggles converting percentages to fractions",
-    )
-
     sessions_repo = LearningSessionRepository(db)
-    for question, concept in DEMO_SESSIONS:
-        await sessions_repo.create(
-            LearningSession(
-                user_id=student.id, question=question,
-                ai_response="(demo) Here's a clear explanation with a worked example…",
-                subject="Mathematics", chapter="Fractions & Decimals", grade="8",
-                primary_concept=concept, concepts_discussed=[concept],
-                bloom_level="Apply", difficulty_level="medium", intent="concept_explanation",
+    streaks = [6, 4, 3, 2, 1]
+    session_counts = [4, 3, 3, 2, 1]
+    first_student = None
+
+    for idx, (username, tag, target) in enumerate(DEMO_KIDS):
+        student = await users.create(
+            User(email=f"{tag}@demo.roognis.ai", username=username,
+                 password_hash=ph, role=Role.STUDENT, is_verified=True)
+        )
+        first_student = first_student or student
+
+        await profiles.create(
+            StudentProfile(
+                user_id=student.id, grade="8", subjects=["Mathematics"],
+                current_chapter="Fractions & Decimals",
+                behavioral_signals=BehavioralSignals(
+                    engagement_streak=streaks[idx % len(streaks)],
+                    dominant_subject="Mathematics",
+                ),
             )
         )
+        await enrollments.create(Enrollment(classroom_id=classroom.id, student_id=student.id))
+
+        if target is not None:
+            for ci, (name, _base) in enumerate(DEMO_CONCEPTS):
+                rec = await mastery_repo.get_or_create(student.id, nodes[name].id, name)
+                rec.score = max(0.0, min(100.0, float(target + (ci - 4) * 3)))
+                rec.interaction_count = 3
+                await mastery_repo.update(rec)
+            if target < 60:
+                g = await gap_repo.get_or_create(
+                    student.id, nodes["Proportions"].id, "Proportions",
+                    "Confuses ratio direction when setting up proportions",
+                )
+                g.severity, g.confidence, g.occurrence_count = "high", "high", 3
+                await gap_repo.update(g)
+            if target < 35:
+                await gap_repo.get_or_create(
+                    student.id, nodes["Percentages"].id, "Percentages",
+                    "Struggles converting percentages to fractions",
+                )
+
+        for question, concept in DEMO_SESSIONS[: session_counts[idx % len(session_counts)]]:
+            await sessions_repo.create(
+                LearningSession(
+                    user_id=student.id, question=question,
+                    ai_response="(demo) Here's a clear explanation with a worked example…",
+                    subject="Mathematics", chapter="Fractions & Decimals", grade="8",
+                    primary_concept=concept, concepts_discussed=[concept],
+                    bloom_level="Apply", difficulty_level="medium", intent="concept_explanation",
+                )
+            )
+
+    # Parent follows the first child, so the parent portal demo has data.
+    await GuardianRepository(db).create(
+        GuardianLink(parent_id=parent.id, student_id=first_student.id)
+    )
 
     await db.commit()
+    logins = ", ".join(f"{tag}@demo.roognis.ai" for _, tag, _ in DEMO_KIDS)
     print(
-        f"Demo seeded: student/teacher/parent (password '{DEMO_PASSWORD}'), "
-        f"school + classroom (join code {DEMO_JOIN_CODE}), "
-        f"{len(DEMO_CONCEPTS)} concepts, mastery, 2 gaps, "
-        f"{len(DEMO_SESSIONS)} sessions, guardian link."
+        f"Demo seeded (password '{DEMO_PASSWORD}'): teacher@demo.roognis.ai, "
+        f"parent@demo.roognis.ai, and {len(DEMO_KIDS)} students [{logins}] — "
+        f"all enrolled in Grade 8 Mathematics (join code {DEMO_JOIN_CODE})."
     )
 
 
