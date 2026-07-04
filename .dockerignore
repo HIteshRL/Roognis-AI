@@ -1,0 +1,16 @@
+**/node_modules
+**/.next
+**/.turbo
+**/dist
+.git
+.gitignore
+# Never bake local secrets into an image (compose injects env at runtime)
+.env
+*.env
+!.env.example
+# Python / backend artifacts not needed by the web image
+**/__pycache__
+**/*.pyc
+**/.venv
+apps/api/uploads
+Backend_ClaudeCode

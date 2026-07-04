@@ -5,8 +5,8 @@ import { useSearchParams } from 'next/navigation'
 import { useDropzone } from 'react-dropzone'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
-import { useAuth } from '@clerk/nextjs'
 import { CheckCircle2, FileText, Loader2, Upload, XCircle } from 'lucide-react'
+import { useAuthStore } from '@/lib/stores/auth.store'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Progress } from '@/components/ui/progress'
@@ -23,7 +23,7 @@ const STATUS_COLORS = {
 export function UploadDashboard() {
   const searchParams = useSearchParams()
   const kbId = searchParams.get('kb') ?? ''
-  const { getToken } = useAuth()
+  const token = useAuthStore((s) => s.token)
   const qc = useQueryClient()
   const [uploading, setUploading] = useState(false)
 
@@ -42,7 +42,7 @@ export function UploadDashboard() {
     select: (r) => r.data,
     enabled: !!selectedKb,
     refetchInterval: (query) => {
-      const docs = query.state.data
+      const docs = query.state.data?.data
       const hasProcessing = docs?.some((d) => d.status === 'processing' || d.status === 'pending')
       return hasProcessing ? 3000 : false
     },
@@ -54,7 +54,6 @@ export function UploadDashboard() {
       setUploading(true)
       for (const file of acceptedFiles) {
         try {
-          const token = await getToken()
           await knowledgeApi.uploadDocument(selectedKb, file, token ?? '')
           toast.success(`Uploaded: ${file.name}`)
           qc.invalidateQueries({ queryKey: ['documents', selectedKb] })
@@ -64,7 +63,7 @@ export function UploadDashboard() {
       }
       setUploading(false)
     },
-    [selectedKb, getToken, qc]
+    [selectedKb, token, qc]
   )
 
   const { getRootProps, getInputProps, isDragActive } = useDropzone({

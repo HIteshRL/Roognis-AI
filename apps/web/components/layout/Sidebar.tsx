@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { UserButton } from '@clerk/nextjs'
+import { AccountButton } from '@/components/layout/AccountButton'
 import {
   AlertTriangle,
   BookOpen,
@@ -148,8 +148,7 @@ export function Sidebar() {
       {/* User */}
       <Separator />
       <div className="flex items-center gap-3 p-4">
-        <UserButton afterSignOutUrl="/login" />
-        <span className="text-sm text-muted-foreground">Account</span>
+        <AccountButton />
       </div>
     </aside>
   )

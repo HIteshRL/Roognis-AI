@@ -1,7 +1,7 @@
 import { create } from 'zustand'
 import type { ConversationDto, MessageDto, StreamSourceDto } from '@roognis/shared'
 
-interface StreamingMessage {
+export interface StreamingMessage {
   content: string
   isStreaming: boolean
 }

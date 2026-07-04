@@ -1,4 +1,5 @@
 import type { ApiError, ApiResponse } from '@roognis/shared'
+import { useAuthStore } from '@/lib/stores/auth.store'
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:8000'
 
@@ -141,3 +142,7 @@ export class ApiClientError extends Error {
 }
 
 export const apiClient = new ApiClient(API_BASE)
+
+// Attach the custom-JWT from the persisted auth store to every request.
+// (Previously never wired up — requests went out unauthenticated.)
+apiClient.setTokenProvider(async () => useAuthStore.getState().token)
