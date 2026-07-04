@@ -522,6 +522,20 @@ Closes the two remaining gaps between the MVP and the scalable full-blown HLD. S
 
 ---
 
+## Phase 1.0 — Fastest Usable MVP (hardening + teacher dashboard)
+
+Directive-driven pass to make the core flow work end-to-end and be staging-deployable. Reuse-only; no foundation changes.
+
+- **Auth defect fixed:** `bcrypt==4.0.1` (env had bcrypt 5.0.0 vs passlib 1.7.4 → `hash_password` threw → register/login dead). Suite went from 200 (3 failing) to **213 green**. Dockerfile now installs from `pyproject.toml` (single source of truth; `[tool.hatch.build.targets.wheel] packages=["src"]`) instead of a drift-prone manual list.
+- **Role at signup:** `RegisterRequest.role` = `Literal[student|parent|teacher]` (school_admin/admin promotion-only); web `RegisterForm` selector. Unblocks the teacher/parent dashboards (a new user previously landed as `student`).
+- **Demo seed:** `SEED_DEMO=1` in `scripts/seed.py` — idempotent student/teacher/parent + school/classroom (join `DEMO24`) + concept graph + mastery/gaps/sessions + guardian link, so dashboards render populated on first login.
+- **Golden-path smoke test:** `scripts/smoke_test.py` — httpx E2E over the whole flow with PASS/FAIL per step (`--skip-chat` for no-GROQ envs).
+- **Teacher Classroom Analytics:** batch `GROUP BY` repo methods (no N+1) → `ClassroomAnalyticsService` (auth reused from `ClassroomService.roster`) → `GET /school/classrooms/{id}/analytics` → `ClassroomAnalyticsView` (per-student progress table, mastery distribution, common weak concepts). Closes the "teachers can't monitor" gap.
+
+**Deferred (post-funding / next phases):** student onboarding + help tooltips, Notes, Bookmarks, teacher Assignments, parent weekly digest + alerts, admin CRUD expansion, CI/CD + backups, self-serve billing.
+
+---
+
 ## Dependency Graph
 
 ```
