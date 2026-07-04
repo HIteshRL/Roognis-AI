@@ -48,6 +48,7 @@ class AuthService:
             email=dto.email,
             username=dto.username,
             password_hash=_pwd_context.hash(dto.password),
+            role=dto.role,
         )
         user = await self._users.create(user)
 
