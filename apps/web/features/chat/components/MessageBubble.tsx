@@ -54,7 +54,15 @@ export function MessageBubble({ message }: MessageBubbleProps) {
         {imageAttachments.length > 0 && (
           <div className="mb-2 flex flex-wrap gap-2">
             {imageAttachments.map((att) => (
-              <AttachmentImage key={att.id} attachment={att} />
+              <AttachmentImage
+                key={att.id}
+                attachment={att}
+                alt={
+                  isAssistant
+                    ? 'AI-generated illustration for this explanation'
+                    : 'Image you attached to your question'
+                }
+              />
             ))}
           </div>
         )}

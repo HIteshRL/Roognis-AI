@@ -130,6 +130,7 @@ class AuthService:
             is_active=user.is_active,
             is_verified=user.is_verified,
             is_admin=user.is_admin,
+            role=user.role,
             created_at=user.created_at.isoformat(),
             updated_at=user.updated_at.isoformat(),
         )

@@ -2,6 +2,7 @@
 FastAPI dependency providers — single source of truth for service construction.
 All services are assembled here. Routes receive fully-constructed services.
 """
+from contextlib import asynccontextmanager
 from typing import Annotated
 
 import structlog
@@ -11,11 +12,14 @@ from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from src.application.dtos.user import UserResponse
 from src.application.services.attachment_service import AttachmentService
 from src.application.services.auth_service import AuthService
+from src.application.services.caching_engine import CachingEngine
 from src.application.services.chat_service import ChatService
+from src.application.services.classroom_service import ClassroomService
 from src.application.services.concept_extraction_service import ConceptExtractionService
 from src.application.services.concept_memory_service import ConceptMemoryService
 from src.application.services.context_validation_service import ContextValidationService
 from src.application.services.document_service import DocumentService
+from src.application.services.faq_service import FaqService
 from src.application.services.intent_engine import IntentEngine
 from src.application.services.knowledge_graph_service import KnowledgeGraphService
 from src.application.services.knowledge_library_service import KnowledgeLibraryService
@@ -28,17 +32,19 @@ from src.application.services.learning_path_service import LearningPathService
 from src.application.services.learning_velocity_service import LearningVelocityService
 from src.application.services.mastery_engine import MasteryEngine
 from src.application.services.next_best_topic_engine import NextBestTopicEngine
+from src.application.services.parent_service import ParentService
 from src.application.services.prompt_assembly_service import PromptAssemblyService
 from src.application.services.quiz_generation_service import QuizGenerationService
 from src.application.services.quiz_service import QuizService
 from src.application.services.rag_service import RagService
-from src.application.services.response_cache_service import ResponseCacheService
 from src.application.services.response_image_service import ResponseImageService
 from src.application.services.retrieval_service import RetrievalService
+from src.application.services.school_service import SchoolService
 from src.application.services.search_service import SearchService
 from src.application.services.session_memory_service import SessionMemoryService
 from src.application.services.skill_graph_service import SkillGraphService
 from src.application.services.student_profile_service import StudentProfileService
+from src.application.services.syllabus_service import SyllabusService
 from src.application.services.user_service import UserService
 from src.application.services.vector_service import VectorService
 from src.application.services.video_generation_service import VideoGenerationService
@@ -51,6 +57,10 @@ from src.infrastructure.database.repositories.attachment_repository import (
 from src.infrastructure.database.repositories.conversation_repository import (
     ConversationRepository,
     MessageRepository,
+)
+from src.infrastructure.database.repositories.faq_repository import FaqRepository
+from src.infrastructure.database.repositories.guardian_repository import (
+    GuardianRepository,
 )
 from src.infrastructure.database.repositories.knowledge_repository import (
     ChunkRepository,
@@ -80,8 +90,15 @@ from src.infrastructure.database.repositories.quiz_repository import (
     QuizRepository,
     QuizResponseRepository,
 )
+from src.infrastructure.database.repositories.school_repository import (
+    ClassroomRepository,
+    EnrollmentRepository,
+    SchoolMemberRepository,
+    SchoolRepository,
+    SyllabusRepository,
+)
 from src.infrastructure.database.repositories.user_repository import UserRepository
-from src.infrastructure.database.session import AsyncSession, get_db
+from src.infrastructure.database.session import AsyncSession, AsyncSessionLocal, get_db
 from src.infrastructure.embeddings.factory import get_embedding_provider
 from src.infrastructure.imagegen.factory import get_image_generator
 from src.infrastructure.llm.factory import get_llm_provider
@@ -92,6 +109,14 @@ from src.infrastructure.videogen.factory import get_video_generator
 
 logger = structlog.get_logger(__name__)
 _bearer = HTTPBearer(auto_error=False)
+
+
+@asynccontextmanager
+async def _faq_writer():
+    """Fresh, isolated session for FAQ promotion writes (see CachingEngine)."""
+    async with AsyncSessionLocal() as session:
+        yield FaqRepository(session)
+        await session.commit()
 
 
 # ── Auth ──────────────────────────────────────────────────────────────────────
@@ -135,6 +160,20 @@ async def require_admin(
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail={"code": "FORBIDDEN", "message": "Admin access required"},
+        )
+    return current_user
+
+
+async def require_teacher(
+    current_user: Annotated[UserResponse, Depends(get_current_user)],
+) -> UserResponse:
+    role = getattr(current_user, "role", "student")
+    if role not in ("teacher", "school_admin") and not getattr(
+        current_user, "is_admin", False
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail={"code": "FORBIDDEN", "message": "Teacher access required"},
         )
     return current_user
 
@@ -312,19 +351,27 @@ async def get_rag_service(
     prompt_assembly_svc = PromptAssemblyService(prompt_loader)
     context_validation_svc = ContextValidationService(settings.retrieval_score_threshold)
 
-    response_cache_svc: ResponseCacheService | None = None
+    caching_engine: CachingEngine | None = None
     try:
         redis = await get_redis()
-        response_cache_svc = ResponseCacheService(redis)
+        caching_engine = CachingEngine(
+            redis=redis,
+            faq_repo=FaqRepository(db),
+            faq_writer=_faq_writer,
+            default_ttl=settings.cache_default_ttl_seconds,
+            hot_ttl=settings.cache_hot_ttl_seconds,
+            hot_threshold=settings.cache_hot_threshold,
+            faq_promote_threshold=settings.faq_promote_threshold,
+        )
     except Exception as exc:
-        logger.warning("response_cache_unavailable", error=str(exc))
+        logger.warning("caching_engine_unavailable", error=str(exc))
 
     return RagService(
         retrieval_svc=retrieval_svc,
         prompt_assembly_svc=prompt_assembly_svc,
         context_validation_svc=context_validation_svc,
         llm_provider=get_llm_provider(),
-        response_cache_svc=response_cache_svc,
+        response_cache_svc=caching_engine,
     )
 
 
@@ -498,4 +545,96 @@ def get_quiz_service(
         response_repo=QuizResponseRepository(db),
         mastery_repo=MasteryRepository(db),
         concept_repo=ConceptNodeRepository(db),
+    )
+
+
+# ── School / Classroom (Phase 0.8) ───────────────────────────────────────────
+
+
+def get_school_service(
+    db: Annotated[AsyncSession, Depends(get_db)],
+) -> SchoolService:
+    return SchoolService(
+        school_repo=SchoolRepository(db),
+        member_repo=SchoolMemberRepository(db),
+        user_repo=UserRepository(db),
+    )
+
+
+def get_classroom_service(
+    db: Annotated[AsyncSession, Depends(get_db)],
+    settings: Annotated[Settings, Depends(get_settings)],
+) -> ClassroomService:
+    return ClassroomService(
+        classroom_repo=ClassroomRepository(db),
+        enrollment_repo=EnrollmentRepository(db),
+        member_repo=SchoolMemberRepository(db),
+        syllabus_repo=SyllabusRepository(db),
+        user_repo=UserRepository(db),
+        join_code_length=settings.classroom_join_code_length,
+    )
+
+
+def get_syllabus_service(
+    db: Annotated[AsyncSession, Depends(get_db)],
+) -> SyllabusService:
+    return SyllabusService(
+        syllabus_repo=SyllabusRepository(db),
+        classroom_repo=ClassroomRepository(db),
+        member_repo=SchoolMemberRepository(db),
+        enrollment_repo=EnrollmentRepository(db),
+    )
+
+
+# ── Cache & FAQ Intelligence (ADR-012) ───────────────────────────────────────
+
+
+async def get_caching_engine(
+    db: Annotated[AsyncSession, Depends(get_db)],
+    settings: Annotated[Settings, Depends(get_settings)],
+) -> CachingEngine:
+    redis = None
+    try:
+        redis = await get_redis()
+    except Exception as exc:
+        logger.warning("caching_engine_redis_unavailable", error=str(exc))
+    return CachingEngine(
+        redis=redis,
+        faq_repo=FaqRepository(db),
+        faq_writer=_faq_writer,
+        default_ttl=settings.cache_default_ttl_seconds,
+        hot_ttl=settings.cache_hot_ttl_seconds,
+        hot_threshold=settings.cache_hot_threshold,
+        faq_promote_threshold=settings.faq_promote_threshold,
+    )
+
+
+def get_faq_service(
+    db: Annotated[AsyncSession, Depends(get_db)],
+) -> FaqService:
+    return FaqService(faq_repo=FaqRepository(db))
+
+
+# ── Parent Portal (ADR-013) ──────────────────────────────────────────────────
+
+
+async def get_parent_service(
+    db: Annotated[AsyncSession, Depends(get_db)],
+    settings: Annotated[Settings, Depends(get_settings)],
+) -> ParentService:
+    redis = None
+    try:
+        redis = await get_redis()
+    except Exception as exc:
+        logger.warning("parent_service_redis_unavailable", error=str(exc))
+
+    return ParentService(
+        guardian_repo=GuardianRepository(db),
+        user_repo=UserRepository(db),
+        profile_repo=StudentProfileRepository(db),
+        mastery_repo=MasteryRepository(db),
+        gap_repo=LearningGapRepository(db),
+        session_repo=LearningSessionRepository(db),
+        redis=redis,
+        code_ttl=settings.parent_link_code_ttl_seconds,
     )

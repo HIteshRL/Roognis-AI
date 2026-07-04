@@ -464,6 +464,64 @@ queued → running → completed (+ attachment_id)
 
 ---
 
+## Phase 0.8 — School / Teacher B2B2C Backbone
+
+**What it delivers:**
+- The B2B2C differentiator: schools onboard, teachers run classrooms, students enroll via a join code (Google Classroom-style), and teachers publish a syllabus that flows into the student UI.
+- `users.role` (`student` | `teacher` | `school_admin`) alongside the existing platform `is_admin`. Creating a school promotes the creator to `school_admin`; being added as staff promotes to `teacher` (never demotes a stronger role).
+- Full stack: FastAPI backend, Next.js teacher/student pages, and an Expo `Classes` tab.
+
+**New tables (migration 011):**
+- `schools` — name, slug, address, created_by
+- `school_members` — (school_id, user_id) staff membership with role
+- `classrooms` — school_id, teacher_id, subject/grade, unique `join_code`
+- `enrollments` — (classroom_id, student_id) student membership
+- `syllabus_items` — classroom chapters, `is_published`, optional `knowledge_base_id` link to the RAG document pipeline
+
+**Key files:**
+- Backend: `domain/entities/school.py`, `domain/repositories/school_repository.py`, `infrastructure/database/models/school.py`, `infrastructure/database/repositories/school_repository.py`, `application/dtos/school.py`, `application/services/{school_service,classroom_service,syllabus_service}.py`, `presentation/api/v1/school.py`, migration `011_school_classrooms.py`
+- Web: `lib/api/school.ts`, `features/school/components/{TeacherClassesView,ClassroomDetailView}.tsx`, `features/student/components/MyClassesView.tsx`, routes `/teacher`, `/teacher/classes/[id]`, `/student/classes`
+- Mobile: `src/api/school.ts`, `app/(tabs)/classes.tsx`
+
+**API routes** (all under `/api/v1/school`): `POST /schools`, `GET /schools/mine`, `POST /schools/{id}/teachers`, `GET /schools/{id}/members`, `POST /classrooms`, `GET /classrooms/mine`, `GET/PATCH/DELETE /classrooms/{id}`, `GET /classrooms/{id}/roster`, `POST/GET /classrooms/{id}/syllabus`, `PATCH/DELETE /syllabus/{id}`, `POST /classrooms/join`, `GET /classrooms/enrolled/mine`.
+
+**Auth model:** `require_teacher` gates teacher/admin routes; students use `get_current_user`. Teachers see all syllabus items for their classroom; enrolled students see only `is_published` items. Every management action verifies `classroom.teacher_id == user` OR school-admin membership.
+
+**Design decisions:**
+- `role` added additively with `server_default='student'` — no backfill needed (mirrors migration 006's intent column).
+- Syllabus uploads reuse the existing `knowledge_bases`/document-ingestion pipeline via an optional `knowledge_base_id` FK — no new upload machinery.
+- Join codes use an unambiguous alphabet (no 0/O/1/I), 6 chars, uniqueness-checked on generation.
+
+**Tests:** `tests/services/test_school.py` — 9 unit tests (role promotion, admin-gated teacher add, classroom create + join idempotency, roster auth, syllabus publish visibility). Suite: 190 passing (+9), 3 pre-existing bcrypt failures.
+
+**Dependencies:** Phase 0.0 (auth/users), Phase 0.2 (knowledge_bases for syllabus links).
+
+**Config Keys:** `classroom_join_code_length` (default 6).
+
+---
+
+## Phase 0.9 — Cache & FAQ Intelligence + Parent Portal (MVP → full-blown parity)
+
+Closes the two remaining gaps between the MVP and the scalable full-blown HLD. See `docs/adr/ADR-012-caching-engine.md` and `docs/adr/ADR-013-parent-portal.md`.
+
+### Caching Engine (ADR-012)
+- **`CachingEngine`** realizes the HLD **Cache & FAQ Intelligence** tier: Query Normalizer → Semantic Hash → Hot Query Detector → Cache Policy Manager → Cache Invalidation Controller → FAQ Knowledge Base, over Redis. Drop-in for `ResponseCacheService` on the RAG path (same `get`/`set`).
+- Hot queries (crossing a hit threshold) get a longer TTL and are promoted into `faq_entries` (migration 012) for durability + a public `/faq` endpoint. Invalidation is O(1) via per-scope namespace-version keys (`/admin/cache/invalidate`).
+- Files: `application/services/{query_normalizer,caching_engine,faq_service}.py`; `domain/entities/faq.py`, `domain/repositories/faq_repository.py`, `infrastructure/database/{models,repositories}/faq.py`; `presentation/api/v1/faq.py` + admin cache endpoints; migration `012_faq_cache.py`. Fail-open (works with Redis down).
+- Config: `cache_default_ttl_seconds`, `cache_hot_ttl_seconds`, `cache_hot_threshold`, `faq_promote_threshold`.
+
+### Parent Portal (ADR-013)
+- **Parent Persona**: consent-based guardian links. A student issues a short-lived **family access code** (Redis TTL); a parent redeems it (`/parent/link`) to create a durable `guardian_links` row (migration 013). `users.role` gains `parent` (promoted on first link).
+- Read-only **child overview** composed from existing analytics (`LearningAnalyticsService` + mastery/gap/session repos): avg mastery, mastered count, streak, strengths, weak areas, recent activity. Students list + revoke guardians.
+- Files: `application/services/parent_service.py`; `domain/entities/guardian.py`, `domain/repositories/guardian_repository.py`, `infrastructure/database/{models,repositories}/guardian.py`; `application/dtos/parent.py`; `presentation/api/v1/parent.py`; migration `013_guardian_links.py`.
+- Web: `lib/api/parent.ts`, `features/parent/components/ParentPortalView.tsx`, `features/student/components/GuardiansView.tsx`, routes `/parent` + `/student/guardians`, Sidebar "Parent Portal" + "Family Access".
+
+**Tests:** `test_caching_engine.py` (6) + `test_parent.py` (4) → suite **200 passing** (3 pre-existing bcrypt failures). Ruff clean (31 pre-existing B008s). Web tsc clean (pre-existing UploadDashboard error only).
+
+**Deferred:** mobile parent screens; email/push digest delivery (needs the Notification Service box); true vector-similarity cache (Option C in ADR-012).
+
+---
+
 ## Dependency Graph
 
 ```

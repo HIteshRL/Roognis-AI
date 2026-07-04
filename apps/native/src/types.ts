@@ -27,6 +27,8 @@ export interface UserDto {
   username: string
   is_active: boolean
   is_verified: boolean
+  is_admin?: boolean
+  role?: string
   created_at: string
   updated_at: string
 }

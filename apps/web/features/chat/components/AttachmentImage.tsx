@@ -7,9 +7,10 @@ import type { AttachmentDto } from '@roognis/shared'
 
 interface AttachmentImageProps {
   attachment: AttachmentDto
+  alt?: string
 }
 
-export function AttachmentImage({ attachment }: AttachmentImageProps) {
+export function AttachmentImage({ attachment, alt = 'Attached image' }: AttachmentImageProps) {
   const [url, setUrl] = useState<string | null>(null)
   const [failed, setFailed] = useState(false)
 
@@ -58,7 +59,7 @@ export function AttachmentImage({ attachment }: AttachmentImageProps) {
       {/* eslint-disable-next-line @next/next/no-img-element */}
       <img
         src={url}
-        alt="Attached image"
+        alt={alt}
         className="max-h-64 max-w-full rounded-lg border border-border object-contain"
       />
     </a>

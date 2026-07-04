@@ -72,6 +72,18 @@ class Settings(BaseSettings):
     video_guidance_scale: float = 3.0
     max_concurrent_video_jobs: int = 1
 
+    # ── Phase 0.8: School / Classroom (B2B2C) ────────────────────────────────
+    classroom_join_code_length: int = 6
+
+    # ── Cache & FAQ Intelligence (ADR-012) ───────────────────────────────────
+    cache_default_ttl_seconds: int = 3600
+    cache_hot_ttl_seconds: int = 86400
+    cache_hot_threshold: int = 3
+    faq_promote_threshold: int = 5
+
+    # ── Parent Portal (ADR-013) ──────────────────────────────────────────────
+    parent_link_code_ttl_seconds: int = 604800  # 7 days
+
     # ── Rate Limiting ────────────────────────────────────────────────────────
     rate_limit_default: int = 100
     rate_limit_chat: int = 20

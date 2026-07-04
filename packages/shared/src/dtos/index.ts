@@ -26,6 +26,8 @@ export interface UserDto extends Timestamps {
   username: string
   is_active: boolean
   is_verified: boolean
+  role?: string
+  is_admin?: boolean
 }
 
 export interface ProfileDto extends Timestamps {
