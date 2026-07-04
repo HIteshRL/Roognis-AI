@@ -75,10 +75,13 @@ API_SECRET_KEY=<32+ char random string>
 
 ## 4. Launch
 
+The web app uses its own JWT login (email + password) — **no Clerk account or
+keys are needed**.
+
+### Option A — Full stack via Docker (matches server hosting)
 ```bash
 docker compose up -d --build
 ```
-
 On boot the API container runs `alembic upgrade head` (migrations 001–013) and
 `python scripts/seed.py` (prompt templates + the demo classroom, idempotent).
 
@@ -87,6 +90,20 @@ On boot the API container runs `alembic upgrade head` (migrations 001–013) and
 
 Re-running `docker compose up` is safe: the demo seed skips itself if the demo
 classroom already exists.
+
+### Option B — Local dev mode (fastest to click on one machine)
+```bash
+docker compose up -d postgres redis qdrant     # infra only
+cd apps/api && pip install -e . && alembic upgrade head
+SEED_DEMO=1 uvicorn src.main:app --port 8000   # (reads ../../.env)
+# in another terminal:
+npm install && npm run dev                      # → http://localhost:3000
+```
+
+> **Multi-device note:** if the 5 kids use their own devices, set
+> `NEXT_PUBLIC_API_URL` to the server's reachable address (not `localhost`) and
+> add that web origin to the API's `cors_origins`, or the browsers can't reach
+> the API.
 
 ---
 
