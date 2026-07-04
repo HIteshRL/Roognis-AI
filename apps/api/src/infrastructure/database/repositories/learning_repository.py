@@ -262,6 +262,22 @@ class LearningSessionRepository(AbstractLearningSessionRepository):
         )
         return [_to_session(m) for m in result.scalars().all()]
 
+    async def session_stats_by_users(
+        self, user_ids: list[UUID]
+    ) -> dict[UUID, tuple[int, datetime | None]]:
+        if not user_ids:
+            return {}
+        result = await self._db.execute(
+            select(
+                LearningSessionModel.user_id,
+                func.count(LearningSessionModel.id),
+                func.max(LearningSessionModel.created_at),
+            )
+            .where(LearningSessionModel.user_id.in_([str(u) for u in user_ids]))
+            .group_by(LearningSessionModel.user_id)
+        )
+        return {UUID(uid): (int(count), last) for uid, count, last in result.all()}
+
 
 # ── Concept Node ──────────────────────────────────────────────────────────────
 
@@ -453,6 +469,16 @@ class MasteryRepository(AbstractMasteryRepository):
         val = result.scalar_one()
         return round(float(val), 2) if val else 0.0
 
+    async def average_scores_by_users(self, user_ids: list[UUID]) -> dict[UUID, float]:
+        if not user_ids:
+            return {}
+        result = await self._db.execute(
+            select(MasteryRecordModel.user_id, func.avg(MasteryRecordModel.score))
+            .where(MasteryRecordModel.user_id.in_([str(u) for u in user_ids]))
+            .group_by(MasteryRecordModel.user_id)
+        )
+        return {UUID(uid): round(float(avg), 2) for uid, avg in result.all()}
+
 
 # ── Learning Gap ──────────────────────────────────────────────────────────────
 
@@ -510,6 +536,37 @@ class LearningGapRepository(AbstractLearningGapRepository):
         stmt = stmt.order_by(LearningGapModel.occurrence_count.desc())
         result = await self._db.execute(stmt)
         return [_to_gap(m) for m in result.scalars().all()]
+
+    async def active_gap_counts_by_users(self, user_ids: list[UUID]) -> dict[UUID, int]:
+        if not user_ids:
+            return {}
+        result = await self._db.execute(
+            select(LearningGapModel.user_id, func.count(LearningGapModel.id))
+            .where(
+                LearningGapModel.user_id.in_([str(u) for u in user_ids]),
+                LearningGapModel.is_resolved.is_(False),
+            )
+            .group_by(LearningGapModel.user_id)
+        )
+        return {UUID(uid): int(count) for uid, count in result.all()}
+
+    async def top_concepts_by_users(
+        self, user_ids: list[UUID], limit: int = 5
+    ) -> list[tuple[str, int]]:
+        if not user_ids:
+            return []
+        students = func.count(func.distinct(LearningGapModel.user_id))
+        result = await self._db.execute(
+            select(LearningGapModel.concept_name, students.label("students"))
+            .where(
+                LearningGapModel.user_id.in_([str(u) for u in user_ids]),
+                LearningGapModel.is_resolved.is_(False),
+            )
+            .group_by(LearningGapModel.concept_name)
+            .order_by(students.desc())
+            .limit(limit)
+        )
+        return [(name, int(count)) for name, count in result.all()]
 
     async def resolve(self, gap_id: UUID) -> None:
         result = await self._db.execute(

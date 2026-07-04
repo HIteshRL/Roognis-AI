@@ -116,3 +116,36 @@ class SyllabusItemResponse(BaseModel):
     is_published: bool
     created_at: str
     updated_at: str
+
+
+# ── Classroom Analytics (Teacher Dashboard) ──────────────────────────────────
+
+
+class StudentAnalyticsEntry(BaseModel):
+    student_id: str
+    username: str
+    email: str
+    avg_mastery: float          # 0-100, 0.0 if no records yet
+    active_gap_count: int
+    session_count: int
+    last_activity: str | None   # ISO timestamp or None
+
+
+class MasteryBucket(BaseModel):
+    label: str                  # struggling | developing | proficient | mastered | no_data
+    count: int
+
+
+class MisconceptionConcept(BaseModel):
+    concept_name: str
+    student_count: int          # distinct students with this unresolved gap
+
+
+class ClassroomAnalyticsResponse(BaseModel):
+    classroom_id: str
+    student_count: int
+    total_sessions: int
+    class_avg_mastery: float
+    mastery_distribution: list[MasteryBucket]
+    top_misconceptions: list[MisconceptionConcept]
+    students: list[StudentAnalyticsEntry]

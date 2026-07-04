@@ -15,6 +15,7 @@ import {
   Users,
 } from 'lucide-react'
 import { schoolApi, type CreateSyllabusPayload } from '@/lib/api/school'
+import { ClassroomAnalyticsView } from './ClassroomAnalyticsView'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -144,6 +145,9 @@ export function ClassroomDetailView({ classroomId }: { classroomId: string }) {
           </div>
         )}
       </div>
+
+      {/* Analytics */}
+      <ClassroomAnalyticsView classroomId={classroomId} />
 
       {/* Syllabus */}
       <div>

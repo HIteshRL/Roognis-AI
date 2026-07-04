@@ -59,6 +59,36 @@ export interface SyllabusItem {
   updated_at: string
 }
 
+export interface StudentAnalyticsEntry {
+  student_id: string
+  username: string
+  email: string
+  avg_mastery: number
+  active_gap_count: number
+  session_count: number
+  last_activity: string | null
+}
+
+export interface MasteryBucket {
+  label: string
+  count: number
+}
+
+export interface MisconceptionConcept {
+  concept_name: string
+  student_count: number
+}
+
+export interface ClassroomAnalytics {
+  classroom_id: string
+  student_count: number
+  total_sessions: number
+  class_avg_mastery: number
+  mastery_distribution: MasteryBucket[]
+  top_misconceptions: MisconceptionConcept[]
+  students: StudentAnalyticsEntry[]
+}
+
 export interface CreateClassroomPayload {
   school_id: string
   name: string
@@ -111,6 +141,9 @@ export const schoolApi = {
 
   getRoster: (id: string) =>
     apiClient.get<RosterEntry[]>(`/api/v1/school/classrooms/${id}/roster`),
+
+  getClassroomAnalytics: (id: string) =>
+    apiClient.get<ClassroomAnalytics>(`/api/v1/school/classrooms/${id}/analytics`),
 
   // ── Syllabus ───────────────────────────────────────────────────────────
   getSyllabus: (classroomId: string) =>

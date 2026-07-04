@@ -19,12 +19,14 @@ from src.application.dtos.school import (
 )
 from src.application.dtos.user import UserResponse
 from src.application.interfaces.dependencies import (
+    get_classroom_analytics_service,
     get_classroom_service,
     get_current_user,
     get_school_service,
     get_syllabus_service,
     require_teacher,
 )
+from src.application.services.classroom_analytics_service import ClassroomAnalyticsService
 from src.application.services.classroom_service import ClassroomService
 from src.application.services.school_service import SchoolService
 from src.application.services.syllabus_service import SyllabusService
@@ -255,6 +257,17 @@ async def classroom_roster(
         for e, username, email in roster
     ]
     return ok(data, request_id=request.state.request_id)
+
+
+@router.get("/classrooms/{classroom_id}/analytics", response_model=None)
+async def classroom_analytics(
+    classroom_id: str,
+    request: Request,
+    current_user: Annotated[UserResponse, Depends(require_teacher)],
+    svc: Annotated[ClassroomAnalyticsService, Depends(get_classroom_analytics_service)],
+):
+    data = await svc.classroom_analytics(UUID(classroom_id), UUID(current_user.id))
+    return ok(data.model_dump(mode="json"), request_id=request.state.request_id)
 
 
 # ── Syllabus (teacher writes, student reads published) ───────────────────────

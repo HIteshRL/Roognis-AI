@@ -14,6 +14,7 @@ from src.application.services.attachment_service import AttachmentService
 from src.application.services.auth_service import AuthService
 from src.application.services.caching_engine import CachingEngine
 from src.application.services.chat_service import ChatService
+from src.application.services.classroom_analytics_service import ClassroomAnalyticsService
 from src.application.services.classroom_service import ClassroomService
 from src.application.services.concept_extraction_service import ConceptExtractionService
 from src.application.services.concept_memory_service import ConceptMemoryService
@@ -583,6 +584,18 @@ def get_syllabus_service(
         classroom_repo=ClassroomRepository(db),
         member_repo=SchoolMemberRepository(db),
         enrollment_repo=EnrollmentRepository(db),
+    )
+
+
+def get_classroom_analytics_service(
+    db: Annotated[AsyncSession, Depends(get_db)],
+    classroom_service: Annotated[ClassroomService, Depends(get_classroom_service)],
+) -> ClassroomAnalyticsService:
+    return ClassroomAnalyticsService(
+        classroom_service=classroom_service,
+        mastery_repo=MasteryRepository(db),
+        gap_repo=LearningGapRepository(db),
+        session_repo=LearningSessionRepository(db),
     )
 
 
