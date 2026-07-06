@@ -81,13 +81,18 @@ export function useChat(conversationId?: string) {
         )
         const reader = stream.getReader()
         let newConversationId: string | null = null
+        let buffer = ''
 
         while (true) {
           const { done, value } = await reader.read()
           if (done) break
-          if (!value) continue
+          // Buffer across reads: a single network chunk may split an SSE event,
+          // so only process complete lines and keep the trailing fragment.
+          buffer += value ?? ''
+          const lines = buffer.split('\n')
+          buffer = lines.pop() ?? ''
 
-          for (const line of value.split('\n')) {
+          for (const line of lines) {
             if (!line.startsWith('data: ')) continue
             const raw = line.slice(6).trim()
             if (!raw) continue

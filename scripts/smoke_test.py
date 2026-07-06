@@ -91,7 +91,7 @@ def main() -> int:
     if not args.skip_chat:
         def chat():
             seen = set()
-            with client.stream("POST", f"{api}/chat/stream", headers=auth(student_token),
+            with client.stream("POST", f"{api}/chat", headers=auth(student_token),
                                json={"message": "What is a fraction?", "subject": "Mathematics",
                                      "chapter": "Fractions"}) as r:
                 r.raise_for_status()

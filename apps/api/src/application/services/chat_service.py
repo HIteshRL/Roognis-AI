@@ -229,8 +229,9 @@ class ChatService:
 
         async for chunk in self._llm.stream(llm_messages, config):
             full_content.append(chunk)
-            escaped = chunk.replace('"', '\\"').replace("\n", "\\n")
-            yield f'data: {{"type":"chunk","content":"{escaped}"}}\n\n'
+            # json.dumps handles all escaping (backslashes, control chars, unicode).
+            # Manual escaping corrupted LaTeX/backslash content, e.g. "\frac".
+            yield f"data: {json.dumps({'type': 'chunk', 'content': chunk})}\n\n"
 
         assistant_msg = Message(
             conversation_id=conversation.id,
@@ -258,7 +259,7 @@ class ChatService:
                     }
                     yield f"data: {json.dumps(image_event)}\n\n"
 
-        yield f'data: {{"type":"done","message_id":"{saved.id}"}}\n\n'
+        yield f"data: {json.dumps({'type': 'done', 'message_id': str(saved.id)})}\n\n"
 
         logger.info(
             "chat_streamed",
