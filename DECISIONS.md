@@ -181,3 +181,54 @@ Records significant design and architecture decisions made during development.
 - Fail-closed (raise) — no benefit since the response is already sent; adds confusion.
 
 **Long-term implications:** If session recording becomes critical (e.g., billing based on sessions), the fail-open design must be revisited and at minimum a persistent failure log added.
+
+---
+
+## Decision 011 — Pin `bcrypt==4.0.1` Rather Than `>=4.0.0`
+
+**Decision:** `apps/api/pyproject.toml` pins `bcrypt==4.0.1` exactly, not a range.
+
+**Reasoning:**
+- `bcrypt` ≥4.1 (and 5.x) made the 72-byte password-length limit a hard `ValueError` where it was previously a warning; `passlib==1.7.4`'s bcrypt backend was written against the older behavior and cannot initialize against it, crashing `hash_password` on every call.
+- `4.0.1` is the newest version that still behaves the old way, and it was verified to fix all 3 previously-failing auth tests (203 → after other work, 213 passing, 0 failing).
+- An open range (`>=4.0.0`) would silently reintroduce the exact bug on the next `pip install` once bcrypt 4.1+ is resolved.
+
+**Alternatives considered:**
+- Upgrading `passlib` instead — as of this decision, no passlib release fixes bcrypt 5.x compatibility; this wasn't available.
+- Switching away from passlib to bcrypt directly — larger surface-area change, rejected under the "only fix defects, don't redesign" constraint in effect at the time.
+
+**Long-term implications:** Revisit this pin when passlib ships bcrypt-5-compatible support; until then, any dependency-update pass must not loosen this pin without re-testing auth.
+
+---
+
+## Decision 012 — Remove Clerk From the Web App Entirely (Not Just Make It Optional)
+
+**Decision:** Deleted all `@clerk/nextjs` usage from `apps/web` (`ClerkProvider`, `clerkMiddleware`, `UserButton`, `useUser`, `useAuth`) rather than gating it behind an environment flag.
+
+**Reasoning:**
+- The app's actual authentication has always been a custom JWT (`POST /auth/register`, `POST /auth/login`, `useAuthStore` with Zustand persistence) — Clerk was present in the UI shell but never the real auth path.
+- Clerk's `ClerkProvider` and `clerkMiddleware` throw at request time without valid publishable/secret keys, meaning the web app could not boot at all for anyone without a real Clerk account — a hard blocker for local dev and hosting alike.
+- A feature flag ("use Clerk if configured, else JWT") would have doubled the auth surface for a component that wasn't doing anything useful.
+
+**Alternatives considered:**
+- Provide placeholder/test Clerk keys — rejected; still requires an external account and doesn't remove the maintenance burden of two auth systems.
+- Keep Clerk for future social-login and build a real dual-auth path — deferred; not needed for the current MVP/demo scope, revisit if social login becomes a requirement.
+
+**Long-term implications:** `@clerk/nextjs` is still listed in `apps/web/package.json` (unused) to avoid unnecessary lockfile churn in this pass — a future cleanup can remove the dependency outright. If social login is added later, it should integrate with the existing `useAuthStore`/JWT flow rather than reintroducing Clerk as a parallel system.
+
+---
+
+## Decision 013 — Demo Runs With `RETRIEVAL_ENABLED=false` by Default
+
+**Decision:** The 5-kid demo's recommended `.env` sets `RETRIEVAL_ENABLED=false`, turning off RAG/curriculum retrieval for the AI tutor.
+
+**Reasoning:**
+- The demo has no curriculum documents loaded into Qdrant; with retrieval on, every query would return "no context found" and route through the same general-answer fallback anyway, but with added latency and an unused Qdrant dependency in the critical path.
+- Verified in `chat_service.py` that when RAG returns no context (or is disabled), the service falls back to the `default_system` prompt and answers directly — so disabling retrieval doesn't remove tutor functionality, only removes an unused dependency.
+- Matches the user's explicit framing for this demo: "intelligence and the personalization layer takes a back seat" — tangible features (chat, quiz, dashboards) are the priority, not curriculum-grounded RAG accuracy.
+
+**Alternatives considered:**
+- Leave retrieval on and accept the latency/complexity cost with an empty vector store — rejected as pointless overhead for this specific demo.
+- Upload a small curriculum document set just for the demo — not requested by the user, and adds a step to an already-scoped demo runbook; documented as an option in `docs/DEMO.md` instead of the default.
+
+**Long-term implications:** Any future demo or deployment that wants curriculum-grounded answers must explicitly set `RETRIEVAL_ENABLED=true` and populate Qdrant via the document-upload flow — it will not happen automatically.

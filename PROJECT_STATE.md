@@ -1,150 +1,92 @@
 # Project State Snapshot — Roognis AI
 
-**Date:** 2026-07-03  
-**Last commit:** `097efbb` — Phase 0.5 Learning Orchestration  
-**Branch:** `master`
+**Date:** 2026-07-07
+**Last commit:** `32ce112` — SSE chunk encoding, cross-read buffering, smoke-test path fix
+**Branch:** `feat/multi-chat-cag` (pushed to origin, in sync)
 
 ---
 
-## Overall Completion: ~55%
+## Overall Completion: ~80% of MVP core flow
 
-The core adaptive tutoring intelligence (chat + learning pipeline) is complete through Phase 0.5. Production hardening, advanced assessment, and multi-role features are not yet implemented.
+The full core flow (Login → Dashboard → Subject/Chapter → AI Tutor → Quiz → Progress → Teacher Dashboard → Parent Dashboard) has a working backend + web page at every stage. What's unverified is *live execution* (Docker build, real Groq round-trip) — not missing features. See `HANDOFF.md` for the exact unverified list.
 
 ---
 
-## Backend Status: Phase 0.5 Complete ✅
+## Backend Status
 
 | Component | Status | Notes |
 |-----------|--------|-------|
-| FastAPI scaffold + middleware | ✅ Complete | Auth, rate limiting, CORS, metrics |
-| PostgreSQL ORM (SQLAlchemy async) | ✅ Complete | All 6 migrations applied |
-| JWT authentication | ✅ Complete | Register, login, token validation |
-| Clerk JWT validation | ✅ Complete | Backend verifies Clerk tokens |
-| Streaming chat (SSE) | ✅ Complete | `POST /api/v1/chat/stream` |
-| Groq LLM integration | ✅ Complete | Chat + concept extraction |
-| RAG pipeline | ✅ Complete | Ingest, embed, retrieve, filter |
-| Qdrant vector store | ✅ Complete | Semantic search + RAG retrieval |
-| Concept extraction | ✅ Complete | Bloom level, misconceptions, concepts |
-| Mastery engine | ✅ Complete | Per-concept scores, Bloom-weighted gains |
-| Learning gap detector | ✅ Complete | Misconception → persistent gaps |
-| Learning orchestrator | ✅ Complete | Background pipeline, fail-open |
-| Knowledge graph service | ✅ Complete | Nodes, edges, BFS, topological sort |
-| Next best topic engine | ✅ Complete | Readiness-based recommendations |
-| Learner behavior service | ✅ Complete | Bloom distribution, response pattern |
-| Learning velocity service | ✅ Complete | Points/day, trend detection |
-| Learning analytics service | ✅ Complete | Aggregate view, at-risk concepts |
-| Learner context service | ✅ Complete | 5-section LLM system prompt |
-| **Intent engine** | ✅ **Phase 0.5** | 7-category rule-based classifier |
-| **Concept memory service** | ✅ **Phase 0.5** | Per-concept teaching history |
-| **Learning path service** | ✅ **Phase 0.5** | BFS paths, frontier, coverage |
-| **Skill graph service** | ✅ **Phase 0.5** | Derived Bloom→skill profile |
-| Adaptive assessment / quizzing | ❌ Not started | Planned Phase 0.6 |
-| Teacher/parent dashboard API | ❌ Not started | Planned Phase 0.7 |
-| Production hardening | ❌ Not started | CI/CD, multi-stage Docker |
+| FastAPI scaffold + middleware | Complete | Auth, rate limiting, CORS, metrics |
+| PostgreSQL ORM (async) + migrations | Complete | 001 → 013, verified linked |
+| JWT authentication | Complete | Register (with role selection), login — **auth bug fixed this session** (bcrypt 5.0.0/passlib 1.7.4 conflict was crashing hash_password) |
+| Streaming chat (SSE) | Complete | `POST /api/v1/chat` — **2 encoding bugs fixed this session** (manual JSON escaping, missing cross-read buffering on the client) |
+| Groq LLM integration | Complete | Not yet exercised live in this session |
+| RAG pipeline | Complete | Off by default for the demo (`RETRIEVAL_ENABLED=false`) — tutor falls back to general answers with no curriculum loaded |
+| Concept extraction / mastery / gaps / orchestrator | Complete | Unchanged since Phase 0.5, still fail-open background pipeline |
+| Knowledge graph / learning path / skills | Complete | Unchanged since Phase 0.5 |
+| **School B2B2C** (schools, classrooms, join codes, syllabus) | Complete | Phase 0.8 |
+| **Caching Engine + FAQ** | Complete | Phase 0.9, ADR-012 |
+| **Parent Portal** (guardian links, child overview) | Complete | Phase 0.9, ADR-013 |
+| **Teacher Classroom Analytics** | Complete | This session — batch aggregate queries, no N+1 |
+| Role at signup | Complete | This session — was previously hardcoded to `student` |
+| Generative image/video (v0.71) | Complete | Image real (Fal) or stub; video always stub for the demo (no GPU) |
+| Multi-conversation chat + CAG | Complete | Phase 0.6 |
+| Adaptive assessment (IRT scoring) | Not started | Was suggested Phase 0.6, superseded by other priorities |
+| Admin CRUD expansion | Not started | Explicitly postponed per directive |
+| CI/CD pipeline | Not started | Explicitly postponed per directive |
 
 ---
 
-## Frontend Status: Phase 0.5 Complete ✅
+## Frontend Status (Web)
 
 | Component | Status | Notes |
 |-----------|--------|-------|
-| Next.js 15 + Turbopack setup | ✅ Complete | App Router, TypeScript |
-| Clerk authentication UI | ✅ Complete | Sign in, sign up, protected routes |
-| Chat interface (streaming) | ✅ Complete | Markdown, code highlighting, SSE |
-| Student profile page | ✅ Complete | Grade, subjects, chapter |
-| Session history view | ✅ Complete | Includes intent field |
-| Mastery dashboard | ✅ Complete | Per-concept scores + labels |
-| Learning gaps view | ✅ Complete | Severity, resolve action |
-| Knowledge graph view | ✅ Complete | Nodes + edges visualization |
-| Recommendations view | ✅ Complete | NextBestTopic readiness cards |
-| Statistics dashboard | ✅ Complete | Analytics aggregates |
-| Learning timeline | ✅ Complete | Session history by date |
-| Weak areas view | ✅ Complete | Low-score concepts |
-| **Learning path view** | ✅ **Phase 0.5** | Frontier + prerequisites + coverage |
-| **Skills view** | ✅ **Phase 0.5** | Skill profile + Bloom distribution |
-| Teacher dashboard | ❌ Not started | Planned Phase 0.7 |
-| Admin panel | ❌ Not started | Planned Phase 0.7 |
+| Next.js 15 App Router | Complete | **Clerk removed entirely this session** — was blocking boot without real Clerk keys; app already used its own JWT |
+| Custom JWT auth (login/register + role select) | Complete | `AuthGuard` (route protection) + `AccountButton` (logout) replace Clerk's middleware/UserButton |
+| API client → JWT wiring | **Fixed this session** | `setTokenProvider` was defined but never called — every request went out unauthenticated (would 401) |
+| Chat interface (streaming, markdown, images) | Complete | SSE parsing bug fixed this session (cross-read buffering) |
+| Student dashboard, mastery, gaps, learning path, skills, statistics, timeline | Complete | Unchanged since Phase 0.5 |
+| My Classes (student), Teacher Portal, Classroom Analytics | Complete | Phase 0.8 + this session |
+| Parent Portal, Family Access (guardian codes) | Complete | Phase 0.9 |
+| `tsc --noEmit` | **Fully clean** | First time — 2 pre-existing build errors fixed this session |
+| Web Docker image | **Unverified** | Dockerfile rewritten (pnpm→npm, standalone output) but never actually built |
+| Student onboarding / tooltips | Not started | Explicitly postponed |
 
 ---
 
-## Database Status: All Migrations Applied ✅
+## Database Status: All Migrations Applied, Chain Verified
 
-| Migration | Status | Description |
-|-----------|--------|-------------|
-| 001 | ✅ | Users, profiles, settings, conversations, messages |
-| 002 | ✅ | Knowledge bases, documents, chunks |
-| 003 | ✅ | Curriculum-bound RAG (knowledge_base metadata) |
-| 004 | ✅ | Learning engine (concept_nodes, concept_edges, mastery_records, learning_gaps, learning_sessions) |
-| 005 | ✅ | Behavioral signals (JSONB on student_profiles) |
-| 006 | ✅ | Phase 0.5 (intent on learning_sessions, concept_memory table) |
+| Migration | Description |
+|-----------|--------------|
+| 001–006 | Users/auth → RAG → curriculum RAG → learning engine → behavioral signals → intent/concept-memory (Phase 0.5 and earlier) |
+| 007–010 | Multi-conversation/CAG, multimodal attachments, media jobs (Phase 0.6 / v0.71) |
+| 011 | School B2B2C: schools, school_members, classrooms, enrollments, syllabus_items |
+| 012 | FAQ cache (`faq_entries`) |
+| 013 | Guardian links (`guardian_links`) |
 
-**Next migration:** `007` — no current requirement; assign when Phase 0.6 schema needs arise.
-
----
-
-## API Status: Complete ✅
-
-All Phase 0.5 endpoints implemented and wired in `dependencies.py`:
-
-| Route | Status |
-|-------|--------|
-| Auth endpoints (register, login) | ✅ |
-| Chat stream endpoint | ✅ |
-| Student profile (GET/POST) | ✅ |
-| Student sessions (paginated) | ✅ |
-| Student mastery | ✅ |
-| Student gaps + resolve | ✅ |
-| Student recommendations | ✅ |
-| Student analytics | ✅ |
-| Student memory (concept teaching history) | ✅ Phase 0.5 |
-| Student learning-path + frontier + coverage | ✅ Phase 0.5 |
-| Student skills (derived profile) | ✅ Phase 0.5 |
-| Knowledge graph endpoints | ✅ |
-| Document management (CRUD) | ✅ |
-| RAG query | ✅ |
-| Semantic search | ✅ |
-| Admin endpoints | ✅ |
+**Next migration:** `014` — none currently required.
 
 ---
 
-## Authentication Status: Complete ✅
+## Testing Status: 213/213 Passing (0 failing)
 
-- Backend: JWT via python-jose, passlib/bcrypt (note: bcrypt pinned to 3.2.2 — see Known Bugs)
-- Frontend: Clerk (`@clerk/nextjs`) — handles social login, session management
-- Backend validates Clerk JWTs on every protected request
-- Rate limiting on auth routes: 10 requests/minute
+Was 200 passing / 3 failing (bcrypt/passlib version conflict) before this session's fix. `ruff check apps/api/` clean except 31 pre-existing `B008` (FastAPI DI pattern, not a real issue). `tsc --noEmit` on the web app is fully clean.
 
----
-
-## Deployment Status: Local Only ❌
-
-- Docker Compose for local development: ✅
-- Production Docker images: ❌ (not created)
-- CI/CD pipeline: ❌ (not created)
-- Staging environment: ❌ (not configured)
-- Production environment: ❌ (not configured)
-- Secret management: ❌ (`.env` file only)
+No live end-to-end run has happened yet — `scripts/smoke_test.py` exists and is correct (path bug fixed this session) but has not been executed against a running stack in this environment.
 
 ---
 
-## Testing Status: 156/159 Tests Passing
+## Deployment Status
 
-| Test File | Count | Status |
-|-----------|-------|--------|
-| `test_auth.py` | 3 | ⚠️ 3 pre-existing failures (bcrypt conflict) |
-| `test_mastery_engine.py` | ~15 | ✅ |
-| `test_learner_behavior_service.py` | ~10 | ✅ |
-| `test_learner_context_service.py` | ~8 | ✅ |
-| `test_learning_gap_detector.py` | ~10 | ✅ |
-| `test_learning_velocity_service.py` | ~8 | ✅ |
-| `test_knowledge_graph_service.py` | ~10 | ✅ |
-| `test_curriculum_retrieval.py` | ~12 | ✅ |
-| `test_response_cache_service.py` | ~5 | ✅ |
-| `test_intent_engine.py` | 10 | ✅ Phase 0.5 |
-| `test_skill_graph_service.py` | 8 | ✅ Phase 0.5 |
-| `test_learning_path_service.py` | 8 | ✅ Phase 0.5 |
-
-**No end-to-end tests exist** — only unit/integration tests for service layer.
+| Item | Status |
+|------|--------|
+| Docker Compose (postgres/redis/qdrant/api/web/nginx) | Written, `env_file: .env` wired, seed-on-boot via `SEED_DEMO` | **not run in this session** |
+| API Dockerfile | Fixed this session (installs from `pyproject.toml`, no silent-fail fallback) — not built |
+| Web Dockerfile | Rewritten this session (npm, standalone output) — **not built, highest-risk unverified item** |
+| Demo dataset (5 students + teacher + parent) | Seeded via `SEED_DEMO=1`, idempotent | not run in this session |
+| Local `.env` with real Groq key | Created (git-ignored) | key was shared in plaintext chat — rotate after use |
+| Staging/production environment | Not configured | out of current scope |
+| CI/CD | Not configured | explicitly postponed |
 
 ---
 
@@ -152,36 +94,28 @@ All Phase 0.5 endpoints implemented and wired in `dependencies.py`:
 
 | Document | Status |
 |----------|--------|
-| `CLAUDE.md` | ✅ Created this session |
-| `HANDOFF.md` | ✅ Created this session |
-| `TODO.md` | ✅ Created this session |
-| `CHANGELOG.md` | ✅ Created this session |
-| `DECISIONS.md` | ✅ Created this session |
-| `PROJECT_STATE.md` | ✅ This file |
-| `docs/ARCHITECTURE.md` | ✅ Exists (may need Phase 0.5 update) |
-| `docs/API.md` | ✅ Exists (may need Phase 0.5 update) |
-| `docs/DATABASE.md` | ✅ Exists (may need migration 006 update) |
-| `docs/DEPLOYMENT.md` | ✅ Exists (planned approach only) |
-| `docs/phase-0.4-learning-engine.md` | ✅ Exists (historical) |
+| `HANDOFF.md` | **Rewritten this session** — was frozen at Phase 0.5 |
+| `PROJECT_STATE.md` | **This file, rewritten this session** |
+| `TODO.md` | **Rewritten this session** |
+| `CHANGELOG.md` | Appended this session with a consolidated entry for everything since 0.5.0 |
+| `DECISIONS.md` | Appended this session with the auth-fix, Clerk-removal, and demo-config decisions |
+| `CLAUDE.md` | Current — still accurate as the operating manual |
+| `docs/DEMO.md` | Current — hosting + demo runbook, written this session |
+| `docs/ROADMAP.md` | Current — has a Phase 1.0 section added this session |
+| `docs/adr/ADR-012`, `ADR-013` | Current |
+| `docs/HANDOVER_MOBILE_EXPO.md`, `docs/HANDOVER_v071_GENERATIVE_MULTIMODAL.md` | Historical, phase-specific — not updated, still accurate for their phase |
 
 ---
 
 ## Where the Next Claude Session Should Begin
 
-**Read `CLAUDE.md` first** — it is the operating manual and contains the architectural constraints the user has explicitly requested be maintained.
+**Read `HANDOFF.md` first** — it has the full "what changed, what's verified, what isn't" narrative and the exact next-steps list.
 
-**Then read `HANDOFF.md`** — specifically the "Recommended Next Development Tasks" section.
+**The single highest-value first action:** run the stack live and execute the smoke test.
+```bash
+docker compose up -d --build
+python scripts/smoke_test.py --base-url http://localhost:8000
+```
+This is the one thing that turns "reasoned through carefully" into "actually confirmed working" — nothing in this codebase has been executed end-to-end in this session, only unit-tested and statically verified. If Docker isn't convenient, `docs/DEMO.md` §4 Option B has a local-dev path (`uvicorn` + `npm run dev`) that's faster to iterate on.
 
-**The exact first task** (unless the user specifies otherwise):
-
-**Seed the curriculum knowledge graph.** The learning path and frontier features (Phase 0.5) are fully implemented but require data in `concept_nodes` and `concept_edges` to demonstrate value. Without this data, both features return empty results.
-
-1. Open `scripts/seed.py` and understand what it currently seeds
-2. Add or create a `scripts/seed_curriculum.py` that inserts:
-   - At least 20 concept nodes for one subject (e.g., Class 10 Mathematics) covering: Number Systems, Polynomials, Linear Equations, Quadratic Equations, Arithmetic Progressions, Triangles, Coordinate Geometry, Trigonometry
-   - Prerequisite edges between them (e.g., Quadratic Equations requires Polynomials requires Number Systems)
-3. Run the seed script against the local database
-4. Test `GET /api/v1/student/learning-path` and `GET /api/v1/student/skills` with a student who has some mastery records
-5. Verify the frontier returns correctly ordered recommendations and path_to_concept returns a sensible prerequisite list
-
-**After that:** fix the bcrypt/passlib version conflict (see `TODO.md` High Priority section 2) to get all 159 tests passing.
+If the smoke test (or a manual click-through) surfaces a failure, the highest-suspicion areas — in order — are: (1) the web Docker image build (never actually built), (2) the live Groq streaming round-trip (never actually exercised), (3) anything in `next.config.ts`'s `outputFileTracingRoot` / monorepo package resolution.
