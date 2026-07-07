@@ -1,3 +1,4 @@
+import re
 import time
 
 import structlog
@@ -10,6 +11,13 @@ logger = structlog.get_logger(__name__)
 
 _MIN_CONTEXT_CHUNKS = 1
 _MAX_PER_DOCUMENT = 2
+
+_TOKEN_RE = re.compile(r"[a-z0-9]+")
+_STOPWORDS = frozenset(
+    "the a an of to in on at is are was were be been and or for with as by from "
+    "what how why when where which who whom this that these those it its do does "
+    "can could would should i you he she they we my your explain tell me about".split()
+)
 
 
 class RetrievalService:
@@ -28,11 +36,21 @@ class RetrievalService:
         embedding_provider: AbstractEmbeddingProvider,
         top_k: int = 5,
         score_threshold: float = 0.35,
+        rerank_enabled: bool = True,
+        rerank_pool: int = 20,
+        lexical_weight: float = 0.25,
     ) -> None:
         self._store = vector_store
         self._embedder = embedding_provider
         self._top_k = top_k
         self._threshold = score_threshold
+        self._rerank_enabled = rerank_enabled
+        self._rerank_pool = rerank_pool
+        self._lexical_weight = lexical_weight
+
+    def _fetch_k(self, k: int) -> int:
+        """Fetch a wider candidate pool when re-ranking, then trim to k."""
+        return max(k, self._rerank_pool) if self._rerank_enabled else k
 
     async def retrieve(
         self,
@@ -58,14 +76,14 @@ class RetrievalService:
         t1 = time.monotonic()
         results = await self._store.search(
             query_vector=query_vector,
-            top_k=k,
+            top_k=self._fetch_k(k),
             score_threshold=threshold,
             filter_payload=filter_payload or None,
         )
         retrieval_ms = (time.monotonic() - t1) * 1000
 
         items = self._results_to_items(results)
-        deduped = self._deduplicate(items)
+        deduped = self._rank_and_dedup(query, items, k)
 
         logger.info(
             "retrieval_complete",
@@ -125,14 +143,14 @@ class RetrievalService:
             t1 = time.monotonic()
             results = await self._store.search(
                 query_vector=query_vector,
-                top_k=k,
+                top_k=self._fetch_k(k),
                 score_threshold=threshold,
                 filter_payload=filter_payload,
             )
             total_retrieval_ms += (time.monotonic() - t1) * 1000
 
             items = self._results_to_items(results)
-            deduped = self._deduplicate(items)
+            deduped = self._rank_and_dedup(query, items, k)
 
             context = RetrievedContext(
                 chunks=deduped,
@@ -234,16 +252,54 @@ class RetrievalService:
             for r in results
         ]
 
-    @staticmethod
-    def _deduplicate(
+    def _rank_and_dedup(
+        self,
+        query: str,
         items: list[SearchResultItem],
+        k: int,
         max_per_doc: int = _MAX_PER_DOCUMENT,
     ) -> list[SearchResultItem]:
+        """Order candidates, cap per-document, trim to k.
+
+        When re-ranking is on, order by a hybrid score that blends the dense
+        cosine similarity with lexical overlap against each chunk's heading
+        path + content — so within a chapter-scoped candidate pool, the chunk
+        about the exact concept asked outranks generic chapter chunks. The
+        item's ``.score`` stays the raw cosine (used for the threshold gate
+        and shown to the client); only the ordering changes.
+        """
+        if self._rerank_enabled:
+            q_tokens = self._tokenize(query)
+            ordered = sorted(
+                items,
+                key=lambda it: it.score + self._lexical_weight * self._lexical_overlap(q_tokens, it),
+                reverse=True,
+            )
+        else:
+            ordered = sorted(items, key=lambda x: x.score, reverse=True)
+
         doc_counts: dict[str, int] = {}
         deduped: list[SearchResultItem] = []
-        for item in sorted(items, key=lambda x: x.score, reverse=True):
+        for item in ordered:
             count = doc_counts.get(item.document_id, 0)
             if count < max_per_doc:
                 deduped.append(item)
                 doc_counts[item.document_id] = count + 1
+            if len(deduped) >= k:
+                break
         return deduped
+
+    @staticmethod
+    def _tokenize(text: str) -> set[str]:
+        return {t for t in _TOKEN_RE.findall(text.lower()) if len(t) > 2 and t not in _STOPWORDS}
+
+    def _lexical_overlap(self, q_tokens: set[str], item: SearchResultItem) -> float:
+        """Fraction of the query's content words present in the chunk's
+        heading path + content head. 0.0 when the query has no content words."""
+        if not q_tokens:
+            return 0.0
+        heading = str(item.metadata.get("heading_path") or "")
+        doc_tokens = self._tokenize(f"{heading} {item.content[:400]}")
+        if not doc_tokens:
+            return 0.0
+        return len(q_tokens & doc_tokens) / len(q_tokens)

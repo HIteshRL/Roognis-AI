@@ -220,6 +220,9 @@ def get_chat_service(
             embedding_provider=embedding_provider,
             top_k=settings.retrieval_top_k,
             score_threshold=settings.retrieval_score_threshold,
+            rerank_enabled=settings.retrieval_rerank_enabled,
+            rerank_pool=settings.retrieval_rerank_pool,
+            lexical_weight=settings.retrieval_lexical_weight,
         )
         prompt_assembly_svc = PromptAssemblyService(prompt_loader)
         context_validation_svc = ContextValidationService(settings.retrieval_score_threshold)
@@ -342,6 +345,9 @@ def get_search_service(
         embedding_provider=embedding_provider,
         top_k=settings.retrieval_top_k,
         score_threshold=settings.retrieval_score_threshold,
+        rerank_enabled=settings.retrieval_rerank_enabled,
+        rerank_pool=settings.retrieval_rerank_pool,
+        lexical_weight=settings.retrieval_lexical_weight,
     )
     validation_svc = ContextValidationService(settings.retrieval_score_threshold)
     return SearchService(retrieval_svc=retrieval_svc, validation_svc=validation_svc)
@@ -358,6 +364,9 @@ async def get_rag_service(
         embedding_provider=embedding_provider,
         top_k=settings.retrieval_top_k,
         score_threshold=settings.retrieval_score_threshold,
+        rerank_enabled=settings.retrieval_rerank_enabled,
+        rerank_pool=settings.retrieval_rerank_pool,
+        lexical_weight=settings.retrieval_lexical_weight,
     )
     prompt_loader = PromptLoader(db)
     prompt_assembly_svc = PromptAssemblyService(prompt_loader)

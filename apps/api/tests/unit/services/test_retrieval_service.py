@@ -90,3 +90,77 @@ async def test_formatted_context_contains_source_prefix(svc):
     ctx, _ = await svc.retrieve("format test")
     assert "[Source 1:" in ctx.formatted_context
     assert "Binary search" in ctx.formatted_context
+
+
+# ── Hybrid re-rank (Pillar 2: within-chapter concept precision) ──────────────
+
+def _concept_store():
+    """Higher-cosine generic chunk vs. lower-cosine chunk whose heading matches
+    the asked concept."""
+    store = AsyncMock()
+    store.search = AsyncMock(return_value=[
+        SearchResult(
+            id="generic",
+            score=0.80,
+            payload={
+                "document_id": "doc-generic",
+                "content": "Living organisms are made of cells and tissues in the body.",
+                "knowledge_base_id": "kb-bio",
+                "heading_path": "Introduction to Biology",
+            },
+        ),
+        SearchResult(
+            id="heart",
+            score=0.70,
+            payload={
+                "document_id": "doc-heart",
+                "content": "The heart pumps blood through four chambers to the body.",
+                "knowledge_base_id": "kb-bio",
+                "heading_path": "The Human Heart",
+            },
+        ),
+    ])
+    return store
+
+
+@pytest.mark.asyncio
+async def test_rerank_promotes_concept_match(mock_embedder):
+    svc = RetrievalService(
+        vector_store=_concept_store(), embedding_provider=mock_embedder,
+        top_k=5, rerank_enabled=True, lexical_weight=0.25,
+    )
+    ctx, _ = await svc.retrieve("explain the heart chambers")
+    # Lower cosine (0.70) but heading + content match the concept → ranks first.
+    assert ctx.chunks[0].content.startswith("The heart pumps")
+    # Raw cosine is preserved for the client / threshold gate.
+    assert ctx.chunks[0].score == 0.70
+
+
+@pytest.mark.asyncio
+async def test_rerank_disabled_keeps_pure_cosine_order(mock_embedder):
+    svc = RetrievalService(
+        vector_store=_concept_store(), embedding_provider=mock_embedder,
+        top_k=5, rerank_enabled=False,
+    )
+    ctx, _ = await svc.retrieve("explain the heart chambers")
+    # Without re-rank, the higher-cosine generic chunk stays on top.
+    assert ctx.chunks[0].score == 0.80
+
+
+@pytest.mark.asyncio
+async def test_rerank_fetches_wider_pool(mock_embedder):
+    store = _concept_store()
+    svc = RetrievalService(
+        vector_store=store, embedding_provider=mock_embedder,
+        top_k=5, rerank_enabled=True, rerank_pool=20,
+    )
+    await svc.retrieve("heart")
+    # The store is asked for the wider pool, not just top_k.
+    assert store.search.call_args.kwargs["top_k"] == 20
+
+
+def test_lexical_overlap_ignores_stopwords():
+    q = RetrievalService._tokenize("what is the heart and how does it work")
+    assert "heart" in q
+    assert "work" in q
+    assert "the" not in q and "is" not in q and "how" not in q

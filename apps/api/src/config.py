@@ -122,6 +122,12 @@ class Settings(BaseSettings):
     retrieval_top_k: int = 5
     retrieval_score_threshold: float = 0.35
     retrieval_enabled: bool = True
+    # Hybrid re-rank: fetch a wider candidate pool, then blend dense cosine
+    # with lexical overlap (heading_path + content) to zero in on the asked
+    # concept within a curriculum-scoped chapter.
+    retrieval_rerank_enabled: bool = True
+    retrieval_rerank_pool: int = 20
+    retrieval_lexical_weight: float = 0.25
 
     # ── Phase 0.2: Storage ───────────────────────────────────────────────────
     storage_provider: Literal["local"] = "local"
