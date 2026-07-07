@@ -110,7 +110,13 @@ class Settings(BaseSettings):
     # ── Phase 0.2: Chunking ──────────────────────────────────────────────────
     chunk_size: int = 512
     chunk_overlap: int = 64
-    chunk_strategy: Literal["fixed", "semantic", "sliding"] = "fixed"
+    chunk_strategy: Literal["fixed", "semantic", "sliding", "adaptive"] = "adaptive"
+    # Adaptive/semantic chunking (structure-aware, dynamically sized):
+    chunk_target_tokens: int = 350
+    chunk_min_tokens: int = 128
+    chunk_safety_ratio: float = 1.15   # tiktoken→embedder-tokenizer headroom
+    chunk_semantic_threshold: float = 0.82   # cosine below this = topic shift
+    chunk_semantic_enabled: bool = True
 
     # ── Phase 0.2: Retrieval ─────────────────────────────────────────────────
     retrieval_top_k: int = 5

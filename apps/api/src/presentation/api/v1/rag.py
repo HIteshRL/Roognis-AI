@@ -38,6 +38,11 @@ def _make_pipeline(settings: Settings) -> IngestionPipeline:
         chunk_size=settings.chunk_size,
         chunk_overlap=settings.chunk_overlap,
         chunk_strategy=settings.chunk_strategy,
+        chunk_target_tokens=settings.chunk_target_tokens,
+        chunk_min_tokens=settings.chunk_min_tokens,
+        chunk_safety_ratio=settings.chunk_safety_ratio,
+        chunk_semantic_threshold=settings.chunk_semantic_threshold,
+        chunk_semantic_enabled=settings.chunk_semantic_enabled,
     )
 
 

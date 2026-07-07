@@ -45,7 +45,12 @@ class VectorService:
         indexed: list[DocumentChunk] = []
         for i in range(0, len(chunks), _BATCH_SIZE):
             batch = chunks[i : i + _BATCH_SIZE]
-            texts = [c.content for c in batch]
+            # Contextual retrieval: embed a curriculum-prefixed version of the
+            # chunk so short chunks stay disambiguated ("It equals ma" →
+            # "Physics > Force > Newton's Second Law: It equals ma"). The clean
+            # content is what gets stored and shown; only the embedded text is
+            # enriched. Mirrors RetrievalService._enrich_query on the query side.
+            texts = [self._embed_text(c, document_title, academic_meta) for c in batch]
             result = await self._embedder.embed(texts)
 
             points = [
@@ -81,6 +86,24 @@ class VectorService:
             )
 
         return indexed
+
+    @staticmethod
+    def _embed_text(
+        chunk: DocumentChunk, document_title: str | None, academic_meta: dict | None
+    ) -> str:
+        """Build the curriculum-prefixed string to embed (not to store)."""
+        parts: list[str] = []
+        meta = academic_meta or {}
+        for key in ("subject", "chapter", "topic"):
+            val = meta.get(key)
+            if val:
+                parts.append(str(val))
+        heading = chunk.metadata.get("heading_path") if chunk.metadata else None
+        if heading and heading not in parts:
+            parts.append(str(heading))
+        if not parts:
+            return chunk.content
+        return f"{' > '.join(parts)}:\n{chunk.content}"
 
     async def delete_document_vectors(self, document_id: str) -> None:
         await self._ensure_collection()
