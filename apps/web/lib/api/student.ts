@@ -37,6 +37,33 @@ export interface UpdateProfilePayload {
   current_chapter?: string | null
 }
 
+// ── Psychometric (Phase A) ────────────────────────────────────────────────
+
+export interface PsychometricQuestionOption {
+  value: string
+  label: string
+}
+
+export interface PsychometricQuestion {
+  key: string
+  dimension: 'motivation' | 'discipline' | 'interest' | 'learning_style' | 'confidence'
+  type: 'likert' | 'choice'
+  text: string
+  options: PsychometricQuestionOption[]
+}
+
+export interface PsychometricProfile {
+  motivation_type: 'intrinsic' | 'extrinsic' | 'mixed' | null
+  motivation_strength: number
+  discipline: number
+  interests: string[]
+  learning_style_preference: 'visual' | 'verbal' | 'hands_on' | 'reading' | null
+  confidence_self_report: number
+  sources: Record<string, 'survey' | 'inferred' | 'blended'>
+  completeness: number
+  assessed_at: string | null
+}
+
 export interface LearningSession {
   id: string
   user_id: string
@@ -193,6 +220,19 @@ export const studentApi = {
     ),
 
   getSkillProfile: () => apiClient.get<SkillProfile>('/api/v1/student/skills'),
+
+  // ── Psychometric (Phase A) ────────────────────────────────────────────────
+
+  getPsychometricQuestions: (limit = 5) =>
+    apiClient.get<PsychometricQuestion[]>(
+      `/api/v1/student/psychometric/questions?limit=${limit}`
+    ),
+
+  submitPsychometricResponse: (payload: { question_key: string; value: string }) =>
+    apiClient.post<PsychometricProfile>('/api/v1/student/psychometric/responses', payload),
+
+  getPsychometricProfile: () =>
+    apiClient.get<PsychometricProfile>('/api/v1/student/psychometric/profile'),
 
   // ── Quiz & Assessment ───────────────────────────────────────────────────
 

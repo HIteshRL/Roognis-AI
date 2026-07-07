@@ -10,6 +10,7 @@ from src.infrastructure.database.models.knowledge import (
 )
 from src.infrastructure.database.models.media_job import MediaJobModel
 from src.infrastructure.database.models.profile import ProfileModel, SettingsModel
+from src.infrastructure.database.models.psychometric import PsychometricResponseModel
 from src.infrastructure.database.models.school import (
     ClassroomModel,
     EnrollmentModel,
@@ -50,4 +51,5 @@ __all__ = [
     "SyllabusItemModel",
     "FaqEntryModel",
     "GuardianLinkModel",
+    "PsychometricResponseModel",
 ]

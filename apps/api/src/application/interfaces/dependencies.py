@@ -35,6 +35,9 @@ from src.application.services.mastery_engine import MasteryEngine
 from src.application.services.next_best_topic_engine import NextBestTopicEngine
 from src.application.services.parent_service import ParentService
 from src.application.services.prompt_assembly_service import PromptAssemblyService
+from src.application.services.psychometric_assessment_service import (
+    PsychometricAssessmentService,
+)
 from src.application.services.quiz_generation_service import QuizGenerationService
 from src.application.services.quiz_service import QuizService
 from src.application.services.rag_service import RagService
@@ -84,6 +87,9 @@ from src.infrastructure.database.repositories.media_job_repository import (
 from src.infrastructure.database.repositories.profile_repository import (
     ProfileRepository,
     SettingsRepository,
+)
+from src.infrastructure.database.repositories.psychometric_repository import (
+    PsychometricRepository,
 )
 from src.infrastructure.database.repositories.quiz_repository import (
     QuizAttemptRepository,
@@ -226,11 +232,16 @@ def get_chat_service(
         memory_repo=ConceptMemoryRepository(db),
         concept_repo=ConceptNodeRepository(db),
     )
+    psychometric_svc = PsychometricAssessmentService(
+        psychometric_repo=PsychometricRepository(db),
+        profile_repo=StudentProfileRepository(db),
+    )
     learner_context_svc = LearnerContextService(
         profile_repo=StudentProfileRepository(db),
         mastery_repo=MasteryRepository(db),
         gap_repo=LearningGapRepository(db),
         concept_memory_svc=concept_memory_svc,
+        psychometric_svc=psychometric_svc,
     )
 
     attachment_repo = MessageAttachmentRepository(db)
@@ -420,6 +431,15 @@ def get_student_profile_service(
     db: Annotated[AsyncSession, Depends(get_db)],
 ) -> StudentProfileService:
     return StudentProfileService(StudentProfileRepository(db))
+
+
+def get_psychometric_service(
+    db: Annotated[AsyncSession, Depends(get_db)],
+) -> PsychometricAssessmentService:
+    return PsychometricAssessmentService(
+        psychometric_repo=PsychometricRepository(db),
+        profile_repo=StudentProfileRepository(db),
+    )
 
 
 def get_session_memory_service(
