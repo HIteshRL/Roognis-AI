@@ -134,6 +134,12 @@ class IngestionPipeline:
                 await job_repo.update(job)
                 await db.commit()
 
+                # Purge any previous vectors for this document first — chunks
+                # get fresh UUIDs on every run, so without this a reindex
+                # would leave stale duplicate points in Qdrant. No-op on
+                # first-time ingestion.
+                await self._vector_svc.delete_document_vectors(str(document_id))
+
                 indexed_chunks = await self._vector_svc.index_chunks(
                     domain_chunks,
                     document_title=doc.title or doc.filename,
