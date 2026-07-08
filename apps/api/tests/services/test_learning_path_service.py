@@ -1,7 +1,8 @@
 """Unit tests for LearningPathService."""
-import pytest
 from unittest.mock import AsyncMock, MagicMock
 from uuid import uuid4
+
+import pytest
 
 from src.application.services.learning_path_service import LearningPathService, _frontier_reason
 from src.domain.entities.learning import ConceptNode, MasteryRecord

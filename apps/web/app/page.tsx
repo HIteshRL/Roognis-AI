@@ -36,10 +36,10 @@ export default function LandingPage() {
         </div>
         <div className="flex items-center gap-3">
           <Button variant="ghost" size="sm" asChild>
-            <Link href="/login">Sign in</Link>
+            <Link href="/student">Dashboard</Link>
           </Button>
           <Button size="sm" asChild>
-            <Link href="/register">Get started</Link>
+            <Link href="/chat">Open the tutor</Link>
           </Button>
         </div>
       </header>
@@ -61,10 +61,10 @@ export default function LandingPage() {
         </p>
         <div className="mt-10 flex flex-col gap-3 sm:flex-row">
           <Button size="lg" asChild>
-            <Link href="/register">Start learning for free</Link>
+            <Link href="/chat">Start learning</Link>
           </Button>
           <Button size="lg" variant="outline" asChild>
-            <Link href="/login">I have an account</Link>
+            <Link href="/student">View my dashboard</Link>
           </Button>
         </div>
       </section>

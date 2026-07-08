@@ -4,6 +4,44 @@ All notable changes are documented here in reverse chronological order.
 
 ---
 
+## [Unreleased] — 2026-07-07 — Phases 0.6–0.9, MVP Hardening, 5-Kid Demo, Web-Boot & Chat Fixes
+
+**Commits:** `097efbb..32ce112` (15 commits) · **Branch:** `feat/multi-chat-cag` (pushed to origin)
+
+Consolidated entry — this stretch spans several phases plus two directed hardening passes; see `HANDOFF.md` for full narrative and `git log --oneline 097efbb..HEAD` for the exact commit list.
+
+### Features Added
+
+- **Multi-conversation chat + CAG retrieval pipeline** (Phase 0.6).
+- **Generative multimodal tutoring (v0.71)** — image generation (Fal, default-on per answer) and on-demand video generation (self-hosted LTX), `media_jobs` table, 3-pane Classroom/NotebookLM chat layout.
+- **Mobile app (Expo)** — standalone React Native client against the hosted backend, custom JWT auth.
+- **School B2B2C (Phase 0.8)** — `users.role`, schools, school_members, classrooms (join codes), enrollments, syllabus_items (migration 011); teacher portal + student "My Classes" on web and mobile.
+- **Caching Engine + FAQ Intelligence (Phase 0.9, ADR-012)** — query normalization, semantic hashing, hot-query detection, scoped cache invalidation, FAQ auto-promotion (migration 012).
+- **Parent Portal (Phase 0.9, ADR-013)** — consent-based guardian linking via 8-char codes, read-only child overview (migration 013).
+- **Role selection at signup** — `RegisterRequest.role: Literal["student","parent","teacher"]`; previously every signup hardcoded to `student`, leaving teacher/parent dashboards unreachable for new accounts.
+- **Teacher Classroom Analytics** — batch `GROUP BY` repository methods (no N+1), `ClassroomAnalyticsService`, `GET /school/classrooms/{id}/analytics`, and a web `ClassroomAnalyticsView` (mastery distribution, common weak concepts, per-student table).
+- **`scripts/smoke_test.py`** — standalone httpx golden-path E2E test against a live stack.
+- **5-kid demo seed** — `SEED_DEMO=1` idempotently seeds 5 students spread across mastery buckets, a classroom, a teacher, and a linked parent.
+- **`docs/DEMO.md`** — server-hosting and live-demo runbook with a demo-lean env profile.
+
+### Fixed
+
+- **Auth was dead at runtime**: `bcrypt==3.2.2` pin conflicted with the installed `bcrypt` 5.0.0 + `passlib` 1.7.4, crashing `hash_password` on every register/login. Pinned `bcrypt==4.0.1`. (The old "3 pre-existing test failures" were a real runtime bug, not a benign test-env quirk.)
+- **`docker/api.Dockerfile`** silently fell back to a hand-written dependency list missing `bcrypt`/`qdrant-client`/`fastembed` whenever the editable install failed (`|| true`). Fixed to install from `pyproject.toml` as the single source of truth (added `[tool.hatch.build.targets.wheel] packages=["src"]`), no silent fallback.
+- **Web app could not boot without real Clerk keys**, despite already using a custom JWT for actual authentication. Removed `@clerk/nextjs` usage entirely (`ClerkProvider`, `clerkMiddleware`, `UserButton`, `useUser`, `useAuth`); added `AuthGuard` (client-side route protection) and `AccountButton` (logout).
+- **`apiClient.setTokenProvider` was defined but never called** — every web request went out with no `Authorization` header, so all authenticated calls would 401 regardless of the Clerk issue above. Wired to the persisted auth store.
+- **Chat SSE chunk encoding was invalid JSON for math content**: manual escaping only handled `"` and `\n`, so backslash sequences like `\frac{1}{2}` produced invalid JSON that the browser silently dropped. Switched to `json.dumps` for every SSE event.
+- **`useChat.ts` SSE parsing had no cross-read buffering** — events spanning two network reads failed to parse and were silently lost (garbled/missing streamed text). Added proper line buffering across reads.
+- **`docker/web.Dockerfile`** used `pnpm install --frozen-lockfile`, but the repo ships `package-lock.json` (npm), not a pnpm lockfile — the image would never have built. Rewritten for npm; added Next.js `output: 'standalone'` + `outputFileTracingRoot`, and a `.dockerignore`.
+- Two pre-existing `tsc` build errors (`UploadDashboard.tsx`, `chat.store.ts`'s unexported `StreamingMessage`) — `tsc --noEmit` is now fully clean.
+- `scripts/smoke_test.py` posted to the wrong chat endpoint (`/chat/stream` instead of the real `POST /api/v1/chat`).
+
+### Test / Build Status
+
+213 backend tests passing (0 failing; was 200 passing / 3 failing before the bcrypt fix). `ruff check apps/api/` clean except 31 pre-existing `B008` (FastAPI DI idiom, not a bug). Web `tsc --noEmit` fully clean for the first time.
+
+---
+
 ## [0.5.0] — 2026-07-03 — Phase 0.5: Learning Orchestration
 
 **Commit:** `097efbb`  

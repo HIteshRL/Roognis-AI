@@ -1,8 +1,9 @@
 """Unit tests for LearningVelocityService — Phase 0.4 velocity trend + retention risk."""
-import pytest
 from datetime import UTC, datetime, timedelta
 from unittest.mock import AsyncMock
 from uuid import uuid4
+
+import pytest
 
 from src.application.services.learning_velocity_service import LearningVelocityService
 from src.domain.entities.learning import LearningSession, MasteryRecord

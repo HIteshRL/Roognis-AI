@@ -1,3 +1,4 @@
+import contextlib
 import os
 
 import aiofiles
@@ -25,10 +26,8 @@ class LocalFileStorage(AbstractFileStorage):
             return await f.read()
 
     async def delete(self, storage_path: str) -> None:
-        try:
+        with contextlib.suppress(FileNotFoundError):
             os.remove(storage_path)
-        except FileNotFoundError:
-            pass
 
     async def exists(self, storage_path: str) -> bool:
         return os.path.exists(storage_path)

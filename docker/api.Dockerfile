@@ -10,13 +10,13 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     build-essential libpq-dev \
     && rm -rf /var/lib/apt/lists/*
 
-FROM base AS deps
-COPY apps/api/pyproject.toml .
-RUN pip install hatch && hatch env create && pip install -e ".[dev]" || true
-RUN pip install fastapi uvicorn[standard] pydantic pydantic-settings sqlalchemy[asyncio] asyncpg alembic redis python-jose passlib httpx groq python-multipart structlog python-dotenv
-
-FROM deps AS runtime
+FROM base AS runtime
+# Install straight from pyproject.toml (single source of truth — includes
+# bcrypt==4.0.1, qdrant-client, fastembed, jose/passlib extras, prometheus).
+# Editable so `src` resolves to the real tree (keeps prompt/data files intact).
+# No `|| true`: a dependency failure must fail the build, not ship a broken image.
 COPY apps/api/ .
+RUN pip install --upgrade pip && pip install -e .
 
 EXPOSE 8000
 

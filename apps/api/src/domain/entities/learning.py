@@ -152,6 +152,7 @@ class MasteryRecord:
     id: UUID = field(default_factory=uuid4)
     score: float = 0.0          # 0–100
     interaction_count: int = 0
+    ability_rating: float | None = None   # Elo θ from adaptive assessment (Phase B); None until first quiz
     last_updated: datetime = field(default_factory=lambda: datetime.now(UTC))
     created_at: datetime = field(default_factory=lambda: datetime.now(UTC))
 

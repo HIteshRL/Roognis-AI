@@ -7,12 +7,10 @@ only context retrieved from within those bounds and is instructed to reply
 "I cannot find this information in the provided curriculum." when nothing is found.
 """
 import time
-from uuid import UUID
 
 import structlog
 
 from src.application.dtos.knowledge import (
-    CurriculumFilter,
     RagChunkResult,
     RagObservability,
     RagQueryRequest,

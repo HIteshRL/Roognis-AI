@@ -1,11 +1,10 @@
 """Integration tests for /api/v1/student endpoints."""
-import pytest
 from unittest.mock import AsyncMock, MagicMock
 from uuid import uuid4
 
+import pytest
 from fastapi.testclient import TestClient
 
-from src.application import interfaces
 from src.application.interfaces import dependencies
 from src.main import app
 
@@ -18,8 +17,9 @@ def _mock_user():
 
 
 def _make_profile(user_id):
+    from datetime import UTC, datetime
+
     from src.domain.entities.learning import BehavioralSignals, StudentProfile
-    from datetime import datetime, UTC
     p = StudentProfile.__new__(StudentProfile)
     p.id = uuid4()
     p.user_id = user_id

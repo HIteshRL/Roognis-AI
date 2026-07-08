@@ -26,6 +26,22 @@ _MAX_ACTIVE_GAPS = 5
 _MAX_STRENGTHS = 3
 _MAX_STRUGGLING_CONCEPTS = 3
 
+_INTEREST_LABELS: dict[str, str] = {
+    "science_engineering": "science & engineering",
+    "mathematics": "mathematics",
+    "technology": "technology & computing",
+    "humanities": "history & humanities",
+    "arts": "art, music & design",
+    "sports_health": "sports & health",
+}
+
+_LEARNING_STYLE_HINTS: dict[str, str] = {
+    "visual": "Prefers visuals: use diagrams, tables, and worked layouts",
+    "verbal": "Prefers spoken-style explanation: talk through the reasoning in plain language",
+    "hands_on": "Prefers practice: give something concrete to try immediately",
+    "reading": "Prefers reading: give clear written definitions and structured notes",
+}
+
 _INTENT_INSTRUCTIONS: dict[str, str] = {
     "concept_explanation": "The student wants to understand a concept — start with the core principle, then build up.",
     "problem_solving": "The student wants to solve a problem — walk through the method step by step.",
@@ -49,11 +65,13 @@ class LearnerContextService:
         mastery_repo: AbstractMasteryRepository,
         gap_repo: AbstractLearningGapRepository,
         concept_memory_svc=None,   # ConceptMemoryService | None — optional to avoid circular import
+        psychometric_svc=None,     # PsychometricAssessmentService | None — optional (Phase A)
     ) -> None:
         self._profiles = profile_repo
         self._mastery = mastery_repo
         self._gaps = gap_repo
         self._concept_memory = concept_memory_svc
+        self._psychometric = psychometric_svc
 
     async def build(self, user_id: UUID, current_intent: str = "unknown") -> str | None:
         profile = await self._profiles.get_by_user_id(user_id)
@@ -83,6 +101,12 @@ class LearnerContextService:
             teaching_history = await self._build_teaching_history(user_id)
             if teaching_history:
                 sections.append(teaching_history)
+
+        # ── Section 6: Motivation & Mindset (Phase A) ────────────────────
+        if self._psychometric:
+            mindset = await self._build_motivation_mindset(user_id)
+            if mindset:
+                sections.append(mindset)
 
         # ── Section 5: Adaptation Instructions ───────────────────────────
         instructions = self._build_adaptation_instructions(profile, bs, current_intent)
@@ -197,6 +221,43 @@ class LearnerContextService:
             if mem.teaching_notes:
                 line += f" (recurring confusion: \"{mem.teaching_notes[-1]}\")"
             lines.append(line)
+        return "\n".join(lines) if len(lines) > 1 else ""
+
+    async def _build_motivation_mindset(self, user_id: UUID) -> str:
+        try:
+            prof = await self._psychometric.get_profile(user_id)
+        except Exception:
+            return ""
+        if not prof or prof.is_empty:
+            return ""
+
+        lines: list[str] = ["### Motivation & Mindset"]
+
+        if prof.motivation_type == "extrinsic":
+            lines.append(
+                "- Grade-driven: tie explanations to exam outcomes, marks, and what's testable"
+            )
+        elif prof.motivation_type == "intrinsic":
+            lines.append(
+                "- Curiosity-driven: lead with the interesting *why* before the mechanics"
+            )
+        elif prof.motivation_type == "mixed":
+            lines.append("- Motivated by both interest and results — balance the two")
+
+        if prof.discipline and prof.discipline < 0.4:
+            lines.append(
+                "- Low self-regulation: break work into small, immediately-doable steps and check in often"
+            )
+        elif prof.discipline and prof.discipline >= 0.75:
+            lines.append("- Strong self-regulation: safe to assign multi-step work and stretch goals")
+
+        if prof.interests:
+            readable = ", ".join(_INTEREST_LABELS.get(i, i) for i in prof.interests[:2])
+            lines.append(f"- Draw examples from their interests when possible: {readable}")
+
+        if prof.learning_style_preference in _LEARNING_STYLE_HINTS:
+            lines.append(f"- {_LEARNING_STYLE_HINTS[prof.learning_style_preference]}")
+
         return "\n".join(lines) if len(lines) > 1 else ""
 
     @staticmethod

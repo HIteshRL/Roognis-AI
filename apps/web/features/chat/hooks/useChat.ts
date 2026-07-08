@@ -12,14 +12,18 @@ export function useChat(conversationId?: string) {
     messages,
     streaming,
     activeConversationId,
+    pendingSubject,
+    pendingChapter,
     setActiveConversation,
     setMessages,
     startStreaming,
     appendStreamChunk,
     finalizeStreaming,
+    clearPendingChat,
+    setSourceMeta,
+    setStreamingImageId,
   } = useChatStore()
 
-  // Load conversation messages when id changes
   useEffect(() => {
     if (!conversationId) {
       setMessages([])
@@ -37,28 +41,58 @@ export function useChat(conversationId?: string) {
       .catch(() => toast.error('Could not load conversation'))
   }, [conversationId, activeConversationId, setMessages, setActiveConversation])
 
-  // Scroll to bottom on new content
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [messages.length, streaming?.content])
 
   const sendMessage = useCallback(
-    async (content: string) => {
-      if (!content.trim() || streaming?.isStreaming) return
+    async (content: string, files?: File[]) => {
+      const hasFiles = !!files && files.length > 0
+      const text = content.trim()
+      if ((!text && !hasFiles) || streaming?.isStreaming) return
+
+      const finalText =
+        text || 'Please look at this image and help me understand it.'
 
       startStreaming()
 
       try {
-        const stream = await chatApi.sendMessage(content, activeConversationId ?? undefined)
+        let attachmentIds: string[] = []
+        if (hasFiles) {
+          try {
+            const uploaded = await Promise.all(
+              files!.map((f) => chatApi.uploadAttachment(f)),
+            )
+            attachmentIds = uploaded.map((u) => u.data.id)
+          } catch {
+            finalizeStreaming()
+            toast.error('Failed to upload image')
+            return
+          }
+        }
+
+        const isNewConversation = !activeConversationId
+        const stream = await chatApi.sendMessage(
+          finalText,
+          activeConversationId ?? undefined,
+          isNewConversation ? (pendingSubject ?? undefined) : undefined,
+          isNewConversation ? (pendingChapter ?? undefined) : undefined,
+          attachmentIds,
+        )
         const reader = stream.getReader()
         let newConversationId: string | null = null
+        let buffer = ''
 
         while (true) {
           const { done, value } = await reader.read()
           if (done) break
-          if (!value) continue
+          // Buffer across reads: a single network chunk may split an SSE event,
+          // so only process complete lines and keep the trailing fragment.
+          buffer += value ?? ''
+          const lines = buffer.split('\n')
+          buffer = lines.pop() ?? ''
 
-          for (const line of value.split('\n')) {
+          for (const line of lines) {
             if (!line.startsWith('data: ')) continue
             const raw = line.slice(6).trim()
             if (!raw) continue
@@ -67,8 +101,18 @@ export function useChat(conversationId?: string) {
               const event = JSON.parse(raw)
               if (event.type === 'meta' && event.conversation_id) {
                 newConversationId = event.conversation_id
+                if (event.rag) {
+                  setSourceMeta({
+                    hasContext: event.rag.has_context,
+                    sourceCount: event.rag.source_count,
+                    cascadeLevel: event.rag.cascade_level ?? 'none',
+                    sources: event.rag.sources ?? [],
+                  })
+                }
               } else if (event.type === 'chunk' && event.content) {
                 appendStreamChunk(event.content)
+              } else if (event.type === 'image' && event.attachment_id) {
+                setStreamingImageId(event.attachment_id)
               } else if (event.type === 'done') {
                 finalizeStreaming()
               }
@@ -78,9 +122,9 @@ export function useChat(conversationId?: string) {
           }
         }
 
-        // Reload full conversation to get persisted messages
         if (newConversationId && newConversationId !== activeConversationId) {
           setActiveConversation(newConversationId)
+          clearPendingChat()
           router.push(`/chat/${newConversationId}`)
         } else if (activeConversationId) {
           const res = await chatApi.getConversation(activeConversationId)
@@ -94,11 +138,16 @@ export function useChat(conversationId?: string) {
     [
       activeConversationId,
       streaming,
+      pendingSubject,
+      pendingChapter,
       startStreaming,
       appendStreamChunk,
       finalizeStreaming,
       setActiveConversation,
       setMessages,
+      clearPendingChat,
+      setSourceMeta,
+      setStreamingImageId,
       router,
     ]
   )

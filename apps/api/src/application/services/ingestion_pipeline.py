@@ -5,19 +5,13 @@ Orchestrates the full document ingestion pipeline:
 Designed to run as a FastAPI BackgroundTask.
 Each step updates the IngestionJob record so the frontend can poll progress.
 """
-import structlog
 from uuid import UUID
 
-from sqlalchemy.ext.asyncio import AsyncSession
+import structlog
 
 from src.application.services.chunking_service import ChunkingService
 from src.application.services.vector_service import VectorService
 from src.domain.entities.knowledge import DocumentChunk
-from src.domain.repositories.knowledge_repository import (
-    AbstractChunkRepository,
-    AbstractDocumentRepository,
-    AbstractIngestionJobRepository,
-)
 from src.infrastructure.database.repositories.knowledge_repository import (
     ChunkRepository,
     DocumentRepository,
@@ -40,6 +34,11 @@ class IngestionPipeline:
         chunk_size: int = 512,
         chunk_overlap: int = 64,
         chunk_strategy: str = "fixed",
+        chunk_target_tokens: int = 350,
+        chunk_min_tokens: int = 128,
+        chunk_safety_ratio: float = 1.15,
+        chunk_semantic_threshold: float = 0.82,
+        chunk_semantic_enabled: bool = True,
     ) -> None:
         self._vector_store = vector_store
         self._embedding_provider = embedding_provider
@@ -47,6 +46,12 @@ class IngestionPipeline:
             chunk_size=chunk_size,
             chunk_overlap=chunk_overlap,
             strategy=chunk_strategy,  # type: ignore[arg-type]
+            embedder=embedding_provider,
+            target_tokens=chunk_target_tokens,
+            min_tokens=chunk_min_tokens,
+            safety_ratio=chunk_safety_ratio,
+            semantic_threshold=chunk_semantic_threshold,
+            semantic_enabled=chunk_semantic_enabled,
         )
         self._vector_svc = VectorService(vector_store, embedding_provider)
 
@@ -94,8 +99,19 @@ class IngestionPipeline:
                 await job_repo.update(job)
                 await db.commit()
 
-                raw_chunks = self._chunking_svc.chunk_document(parsed, doc.metadata)
-                logger.info("document_chunked", chunk_count=len(raw_chunks))
+                # Adaptive/semantic chunking is async (may embed atoms to find
+                # topic boundaries); fixed/sliding stay synchronous.
+                if self._chunking_svc.is_adaptive:
+                    raw_chunks = await self._chunking_svc.chunk_document_adaptive(
+                        parsed, doc.metadata
+                    )
+                else:
+                    raw_chunks = self._chunking_svc.chunk_document(parsed, doc.metadata)
+                logger.info(
+                    "document_chunked",
+                    chunk_count=len(raw_chunks),
+                    strategy=self._chunking_svc.strategy,
+                )
 
                 # Step 3 — Build domain chunk entities
                 domain_chunks = [
@@ -117,6 +133,12 @@ class IngestionPipeline:
                 job.advance("embedding", 50)
                 await job_repo.update(job)
                 await db.commit()
+
+                # Purge any previous vectors for this document first — chunks
+                # get fresh UUIDs on every run, so without this a reindex
+                # would leave stale duplicate points in Qdrant. No-op on
+                # first-time ingestion.
+                await self._vector_svc.delete_document_vectors(str(document_id))
 
                 indexed_chunks = await self._vector_svc.index_chunks(
                     domain_chunks,

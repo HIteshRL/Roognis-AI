@@ -17,7 +17,6 @@ from src.infrastructure.database.models.knowledge import (
     KnowledgeBaseModel,
 )
 
-
 # ── Mappers ───────────────────────────────────────────────────────────────────
 
 def _to_kb(m: KnowledgeBaseModel) -> KnowledgeBase:

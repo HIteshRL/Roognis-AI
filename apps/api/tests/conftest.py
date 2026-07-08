@@ -1,8 +1,8 @@
 import os
-import pytest
-from unittest.mock import AsyncMock, MagicMock
+from unittest.mock import AsyncMock
 from uuid import uuid4
-from datetime import datetime
+
+import pytest
 
 # Override environment before importing app modules
 os.environ.setdefault("API_SECRET_KEY", "test-secret-key-that-is-at-least-32-chars-long")
@@ -11,12 +11,13 @@ os.environ.setdefault("REDIS_URL", "redis://localhost:6379/0")
 os.environ.setdefault("GROQ_API_KEY", "test-key")
 
 from src.infrastructure.logging.setup import configure_logging
+
 configure_logging("WARNING", "console")
 os.environ.setdefault("GROQ_API_KEY", "test-groq-key")
 
-from src.domain.entities.user import User
-from src.domain.entities.profile import Profile, Settings
 from src.domain.entities.conversation import Conversation, Message
+from src.domain.entities.profile import Profile, Settings
+from src.domain.entities.user import User
 
 
 @pytest.fixture

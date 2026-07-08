@@ -21,6 +21,13 @@
       "runtimeArgs": ["compose", "up", "--build"],
       "port": 80,
       "cwd": "."
+    },
+    {
+      "name": "Roognis Mobile Web",
+      "runtimeExecutable": "npx",
+      "runtimeArgs": ["expo", "start", "--web", "--port", "8081"],
+      "port": 8081,
+      "cwd": "apps/native"
     }
   ]
 }

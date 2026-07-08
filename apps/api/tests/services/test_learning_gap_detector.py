@@ -1,11 +1,12 @@
 """Unit tests for LearningGapDetector and LearningGap domain logic."""
-import pytest
 from unittest.mock import AsyncMock, MagicMock
 from uuid import uuid4
 
-from src.domain.entities.learning import LearningGap
-from src.application.services.learning_gap_detector import LearningGapDetector
+import pytest
+
 from src.application.dtos.learning import ConceptExtractionResult
+from src.application.services.learning_gap_detector import LearningGapDetector
+from src.domain.entities.learning import LearningGap
 
 
 def make_gap(**kwargs) -> LearningGap:

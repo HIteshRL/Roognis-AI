@@ -1,8 +1,8 @@
 'use client'
 
 import Link from 'next/link'
-import { useUser } from '@clerk/nextjs'
 import { BrainCircuit, MessageSquare, TrendingUp } from 'lucide-react'
+import { useAuthStore } from '@/lib/stores/auth.store'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 
@@ -17,7 +17,7 @@ const quickActions = [
 ]
 
 export function DashboardView() {
-  const { user } = useUser()
+  const user = useAuthStore((s) => s.user)
 
   return (
     <div className="flex flex-col gap-6 p-6">
@@ -28,7 +28,7 @@ export function DashboardView() {
         </div>
         <div>
           <h1 className="text-xl font-semibold">
-            Good {greeting()}, {user?.firstName ?? 'learner'}
+            Good {greeting()}, {user?.username ?? 'learner'}
           </h1>
           <p className="text-sm text-muted-foreground">Your learning OS is ready.</p>
         </div>

@@ -13,6 +13,7 @@ export const registerSchema = z
       .min(8, 'Password must be at least 8 characters')
       .max(128, 'Password too long'),
     confirmPassword: z.string(),
+    role: z.enum(['student', 'parent', 'teacher']).default('student'),
   })
   .refine((d) => d.password === d.confirmPassword, {
     message: 'Passwords do not match',

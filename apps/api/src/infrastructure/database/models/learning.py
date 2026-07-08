@@ -31,6 +31,7 @@ class StudentProfileModel(Base, UUIDMixin):
     learning_velocity: Mapped[float] = mapped_column(Float, nullable=False, default=0.0)
     confidence_score: Mapped[float] = mapped_column(Float, nullable=False, default=0.0)
     behavioral_signals: Mapped[dict | None] = mapped_column(JSONB, nullable=True, default=dict)
+    psychometric_profile: Mapped[dict | None] = mapped_column(JSONB, nullable=True, default=dict)
     last_active: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )
@@ -141,6 +142,7 @@ class MasteryRecordModel(Base, UUIDMixin):
     concept_name: Mapped[str] = mapped_column(String(200), nullable=False)
     score: Mapped[float] = mapped_column(Float, nullable=False, default=0.0)
     interaction_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    ability_rating: Mapped[float | None] = mapped_column(Float, nullable=True)
     last_updated: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )

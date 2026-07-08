@@ -1,8 +1,9 @@
+import json
 from functools import lru_cache
-from typing import Literal
+from typing import Annotated, Literal
 
-from pydantic import Field, PostgresDsn, RedisDsn
-from pydantic_settings import BaseSettings, SettingsConfigDict
+from pydantic import Field, PostgresDsn, RedisDsn, field_validator
+from pydantic_settings import BaseSettings, NoDecode, SettingsConfigDict
 
 
 class Settings(BaseSettings):
@@ -30,8 +31,23 @@ class Settings(BaseSettings):
     redis_url: RedisDsn
 
     # ── CORS ─────────────────────────────────────────────────────────────────
-    cors_origins: list[str] = ["http://localhost:3000"]
+    # NoDecode: parse it ourselves so a plain env value ("https://a.com" or
+    # "https://a.com,https://b.com") works, not just JSON. Otherwise a bare
+    # CORS_ORIGINS crashes the app on boot.
+    cors_origins: Annotated[list[str], NoDecode] = ["http://localhost:3000"]
     cors_allow_credentials: bool = True
+
+    @field_validator("cors_origins", mode="before")
+    @classmethod
+    def _parse_cors_origins(cls, v: object) -> object:
+        if isinstance(v, str):
+            s = v.strip()
+            if not s:
+                return []
+            if s.startswith("["):
+                return json.loads(s)
+            return [o.strip() for o in s.split(",") if o.strip()]
+        return v
 
     # ── Clerk ────────────────────────────────────────────────────────────────
     clerk_secret_key: str = ""
@@ -42,6 +58,48 @@ class Settings(BaseSettings):
     groq_default_model: str = "llama-3.3-70b-versatile"
     groq_max_tokens: int = 4096
     groq_temperature: float = 0.7
+
+    # ── Phase 0.7: Multimodal (vision) ───────────────────────────────────────
+    groq_vision_model: str = "meta-llama/llama-4-scout-17b-16e-instruct"
+    vision_enabled: bool = True
+    max_image_size_mb: int = 4
+    max_images_per_message: int = 4
+    allowed_image_types: list[str] = [
+        "image/jpeg",
+        "image/png",
+        "image/webp",
+        "image/gif",
+    ]
+
+    # ── v0.71: Generative image (hosted diffusion) ───────────────────────────
+    image_gen_enabled: bool = True
+    response_image_enabled: bool = True
+    image_gen_provider: Literal["fal", "stub"] = "fal"
+    fal_api_key: str = ""
+    image_gen_model: str = "fal-ai/flux/schnell"
+    image_gen_size: str = "1024x1024"
+
+    # ── v0.71: Generative video (self-hosted LTX-Video) ──────────────────────
+    video_gen_enabled: bool = True
+    video_gen_provider: Literal["ltx", "fal", "stub"] = "ltx"
+    fal_video_model: str = "fal-ai/ltx-video"
+    ltx_model_id: str = "Lightricks/LTX-Video"
+    video_num_frames: int = 97
+    video_fps: int = 24
+    video_guidance_scale: float = 3.0
+    max_concurrent_video_jobs: int = 1
+
+    # ── Phase 0.8: School / Classroom (B2B2C) ────────────────────────────────
+    classroom_join_code_length: int = 6
+
+    # ── Cache & FAQ Intelligence (ADR-012) ───────────────────────────────────
+    cache_default_ttl_seconds: int = 3600
+    cache_hot_ttl_seconds: int = 86400
+    cache_hot_threshold: int = 3
+    faq_promote_threshold: int = 5
+
+    # ── Parent Portal (ADR-013) ──────────────────────────────────────────────
+    parent_link_code_ttl_seconds: int = 604800  # 7 days
 
     # ── Rate Limiting ────────────────────────────────────────────────────────
     rate_limit_default: int = 100
@@ -69,12 +127,24 @@ class Settings(BaseSettings):
     # ── Phase 0.2: Chunking ──────────────────────────────────────────────────
     chunk_size: int = 512
     chunk_overlap: int = 64
-    chunk_strategy: Literal["fixed", "semantic", "sliding"] = "fixed"
+    chunk_strategy: Literal["fixed", "semantic", "sliding", "adaptive"] = "adaptive"
+    # Adaptive/semantic chunking (structure-aware, dynamically sized):
+    chunk_target_tokens: int = 350
+    chunk_min_tokens: int = 128
+    chunk_safety_ratio: float = 1.15   # tiktoken→embedder-tokenizer headroom
+    chunk_semantic_threshold: float = 0.82   # cosine below this = topic shift
+    chunk_semantic_enabled: bool = True
 
     # ── Phase 0.2: Retrieval ─────────────────────────────────────────────────
     retrieval_top_k: int = 5
     retrieval_score_threshold: float = 0.35
     retrieval_enabled: bool = True
+    # Hybrid re-rank: fetch a wider candidate pool, then blend dense cosine
+    # with lexical overlap (heading_path + content) to zero in on the asked
+    # concept within a curriculum-scoped chapter.
+    retrieval_rerank_enabled: bool = True
+    retrieval_rerank_pool: int = 20
+    retrieval_lexical_weight: float = 0.25
 
     # ── Phase 0.2: Storage ───────────────────────────────────────────────────
     storage_provider: Literal["local"] = "local"
@@ -92,6 +162,10 @@ class Settings(BaseSettings):
     @property
     def max_upload_size_bytes(self) -> int:
         return self.max_upload_size_mb * 1024 * 1024
+
+    @property
+    def max_image_size_bytes(self) -> int:
+        return self.max_image_size_mb * 1024 * 1024
 
 
 @lru_cache

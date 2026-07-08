@@ -13,8 +13,17 @@ class AbstractConversationRepository(ABC):
 
     @abstractmethod
     async def list_by_user(
-        self, user_id: UUID, page: int, limit: int
+        self, user_id: UUID, page: int, limit: int,
+        subject: str | None = None, chapter: str | None = None,
     ) -> tuple[list[Conversation], int]: ...
+
+    @abstractmethod
+    async def subject_counts(self, user_id: UUID) -> list[tuple[str | None, int]]: ...
+
+    @abstractmethod
+    async def chapter_counts(
+        self, user_id: UUID, subject: str
+    ) -> list[tuple[str | None, int]]: ...
 
     @abstractmethod
     async def update(self, conversation: Conversation) -> Conversation: ...
@@ -26,6 +35,9 @@ class AbstractConversationRepository(ABC):
 class AbstractMessageRepository(ABC):
     @abstractmethod
     async def create(self, message: Message) -> Message: ...
+
+    @abstractmethod
+    async def get_by_id(self, message_id: UUID) -> Message | None: ...
 
     @abstractmethod
     async def list_by_conversation(

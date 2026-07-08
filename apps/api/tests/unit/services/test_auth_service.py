@@ -1,6 +1,6 @@
+from unittest.mock import AsyncMock
+
 import pytest
-from unittest.mock import AsyncMock, patch
-from uuid import uuid4
 
 from src.application.dtos.auth import LoginRequest, RegisterRequest
 from src.application.services.auth_service import AuthService
@@ -32,6 +32,30 @@ async def test_register_success(auth_service, mock_user_repo, mock_profile_repo,
     assert user_resp.email == "test@example.com"
     assert token != ""
     mock_user_repo.create.assert_called_once()
+
+
+@pytest.mark.asyncio
+async def test_register_sets_role(auth_service, mock_user_repo, mock_profile_repo, mock_settings_repo, sample_user):
+    mock_user_repo.get_by_email.return_value = None
+    mock_user_repo.get_by_username.return_value = None
+    mock_user_repo.create.return_value = sample_user
+
+    dto = RegisterRequest(
+        email="teach@example.com", username="teacher1", password="password123", role="teacher"
+    )
+    await auth_service.register(dto)
+
+    created_user = mock_user_repo.create.call_args.args[0]
+    assert created_user.role == "teacher"
+
+
+def test_register_request_rejects_privileged_role():
+    import pydantic
+
+    with pytest.raises(pydantic.ValidationError):
+        RegisterRequest(
+            email="x@example.com", username="sneaky", password="password123", role="school_admin"
+        )
 
 
 @pytest.mark.asyncio

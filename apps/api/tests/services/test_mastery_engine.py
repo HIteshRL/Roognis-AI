@@ -1,11 +1,11 @@
 """Unit tests for MasteryEngine and MasteryRecord domain logic."""
-import pytest
 from unittest.mock import AsyncMock, MagicMock
 from uuid import uuid4
 
-from src.domain.entities.learning import MasteryRecord, BLOOM_GAINS
-from src.application.services.mastery_engine import MasteryEngine
+import pytest
 
+from src.application.services.mastery_engine import MasteryEngine
+from src.domain.entities.learning import MasteryRecord
 
 # ── MasteryRecord domain tests ────────────────────────────────────────────────
 

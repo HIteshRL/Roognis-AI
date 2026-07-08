@@ -74,3 +74,74 @@
 .hljs {
   @apply bg-muted rounded-md text-sm;
 }
+
+/* ── Roognis chat aesthetic ──────────────────────────────────────────────── */
+
+@layer utilities {
+  /* Animated aurora backdrop — subtle, GPU-friendly (opacity/transform only). */
+  .aurora {
+    position: absolute;
+    inset: -40% -20% auto -20%;
+    height: 90%;
+    pointer-events: none;
+    z-index: 0;
+    background:
+      radial-gradient(38% 46% at 20% 22%, hsl(263 70% 55% / 0.28), transparent 70%),
+      radial-gradient(34% 40% at 82% 18%, hsl(199 89% 55% / 0.20), transparent 70%),
+      radial-gradient(40% 44% at 60% 82%, hsl(291 64% 60% / 0.18), transparent 70%);
+    filter: blur(40px) saturate(120%);
+    animation: aurora-drift 22s ease-in-out infinite alternate;
+  }
+  :root:not(.dark) .aurora {
+    opacity: 0.55;
+  }
+
+  .glass {
+    background: hsl(var(--card) / 0.6);
+    backdrop-filter: blur(12px) saturate(140%);
+    -webkit-backdrop-filter: blur(12px) saturate(140%);
+  }
+
+  .text-gradient {
+    background: linear-gradient(120deg, hsl(263 70% 62%), hsl(199 89% 60%));
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+  }
+
+  .msg-in {
+    animation: msg-in 0.34s cubic-bezier(0.22, 1, 0.36, 1) both;
+  }
+}
+
+@keyframes aurora-drift {
+  0% { transform: translate3d(-3%, -2%, 0) rotate(-2deg) scale(1.05); }
+  100% { transform: translate3d(4%, 3%, 0) rotate(3deg) scale(1.12); }
+}
+
+@keyframes msg-in {
+  from { opacity: 0; transform: translateY(10px) scale(0.99); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+@keyframes caret-pulse {
+  0%, 100% { opacity: 1; transform: scaleY(1); }
+  50% { opacity: 0.35; transform: scaleY(0.85); }
+}
+
+/* Streaming caret — a soft, gradient dot rather than a hard block. */
+.stream-caret {
+  display: inline-block;
+  width: 0.5rem;
+  height: 0.9rem;
+  margin-left: 2px;
+  border-radius: 9999px;
+  background: linear-gradient(180deg, hsl(263 70% 62%), hsl(199 89% 60%));
+  vertical-align: text-bottom;
+  animation: caret-pulse 1s ease-in-out infinite;
+}
+
+/* Tighten markdown inside chat bubbles. */
+.chat-prose :where(p, ul, ol, pre, blockquote):first-child { margin-top: 0; }
+.chat-prose :where(p, ul, ol, pre, blockquote):last-child { margin-bottom: 0; }
+.chat-prose pre { @apply rounded-lg; }

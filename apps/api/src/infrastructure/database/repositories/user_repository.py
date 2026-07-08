@@ -17,6 +17,7 @@ def _to_entity(m: UserModel) -> User:
     u.is_active = m.is_active
     u.is_verified = m.is_verified
     u.is_admin = m.is_admin
+    u.role = m.role
     u.clerk_id = m.clerk_id
     u.created_at = m.created_at
     u.updated_at = m.updated_at
@@ -35,6 +36,7 @@ class UserRepository(AbstractUserRepository):
             password_hash=user.password_hash,
             is_active=user.is_active,
             is_verified=user.is_verified,
+            role=user.role,
             clerk_id=user.clerk_id,
         )
         self._db.add(model)
@@ -78,6 +80,7 @@ class UserRepository(AbstractUserRepository):
         model.password_hash = user.password_hash
         model.is_active = user.is_active
         model.is_verified = user.is_verified
+        model.role = user.role
         model.clerk_id = user.clerk_id
         await self._db.flush()
         await self._db.refresh(model)
