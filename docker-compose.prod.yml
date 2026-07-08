@@ -1,0 +1,116 @@
+# Production stack for a single cloud VM.
+#   docker compose -f docker-compose.prod.yml up -d --build
+#
+# Differences from docker-compose.yml (local dev):
+#   - Caddy terminates TLS and reverse-proxies both apps on one domain
+#     (so the browser talks to https://$DOMAIN and /api/* → the API — same
+#     origin, no CORS headaches).
+#   - Datastores (Postgres/Redis/Qdrant) expose NO host ports — reachable only
+#     on the internal Docker network.
+#   - The web image is built with NEXT_PUBLIC_API_URL baked to the public URL
+#     (NEXT_PUBLIC_* are compile-time in Next.js).
+#
+# Required in .env: DOMAIN, PUBLIC_URL, POSTGRES_PASSWORD, API_SECRET_KEY,
+#                   GROQ_API_KEY, FAL_API_KEY (see .env.production.example).
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-roognis}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}
+      POSTGRES_DB: ${POSTGRES_DB:-roognis_ai}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-roognis}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    command: redis-server --appendonly yes
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  qdrant:
+    image: qdrant/qdrant:v1.12.5
+    restart: unless-stopped
+    volumes:
+      - qdrant_data:/qdrant/storage
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost:6333/healthz || exit 1"]
+      interval: 15s
+      timeout: 10s
+      retries: 5
+      start_period: 10s
+
+  api:
+    build:
+      context: .
+      dockerfile: docker/api.Dockerfile
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-roognis}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-roognis_ai}
+      REDIS_URL: redis://redis:6379/0
+      QDRANT_URL: http://qdrant:6333
+      CORS_ORIGINS: ${PUBLIC_URL}
+    depends_on:
+      postgres: { condition: service_healthy }
+      redis: { condition: service_healthy }
+      qdrant: { condition: service_healthy }
+    command: >
+      sh -c "
+        cd /app &&
+        alembic upgrade head &&
+        python /scripts/seed.py &&
+        python /scripts/seed_curriculum.py &&
+        uvicorn src.main:app --host 0.0.0.0 --port 8000
+      "
+    volumes:
+      - ./scripts:/scripts
+      - upload_data:/app/uploads
+
+  web:
+    build:
+      context: .
+      dockerfile: docker/web.Dockerfile
+      args:
+        NEXT_PUBLIC_API_URL: ${PUBLIC_URL}
+        NEXT_PUBLIC_DEMO_MODE: "true"
+    restart: unless-stopped
+    depends_on:
+      - api
+
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      DOMAIN: ${DOMAIN}
+    volumes:
+      - ./docker/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      - web
+      - api
+
+volumes:
+  postgres_data:
+  redis_data:
+  qdrant_data:
+  upload_data:
+  caddy_data:
+  caddy_config:

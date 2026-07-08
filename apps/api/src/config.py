@@ -1,8 +1,9 @@
+import json
 from functools import lru_cache
-from typing import Literal
+from typing import Annotated, Literal
 
-from pydantic import Field, PostgresDsn, RedisDsn
-from pydantic_settings import BaseSettings, SettingsConfigDict
+from pydantic import Field, PostgresDsn, RedisDsn, field_validator
+from pydantic_settings import BaseSettings, NoDecode, SettingsConfigDict
 
 
 class Settings(BaseSettings):
@@ -30,8 +31,23 @@ class Settings(BaseSettings):
     redis_url: RedisDsn
 
     # ── CORS ─────────────────────────────────────────────────────────────────
-    cors_origins: list[str] = ["http://localhost:3000"]
+    # NoDecode: parse it ourselves so a plain env value ("https://a.com" or
+    # "https://a.com,https://b.com") works, not just JSON. Otherwise a bare
+    # CORS_ORIGINS crashes the app on boot.
+    cors_origins: Annotated[list[str], NoDecode] = ["http://localhost:3000"]
     cors_allow_credentials: bool = True
+
+    @field_validator("cors_origins", mode="before")
+    @classmethod
+    def _parse_cors_origins(cls, v: object) -> object:
+        if isinstance(v, str):
+            s = v.strip()
+            if not s:
+                return []
+            if s.startswith("["):
+                return json.loads(s)
+            return [o.strip() for o in s.split(",") if o.strip()]
+        return v
 
     # ── Clerk ────────────────────────────────────────────────────────────────
     clerk_secret_key: str = ""
@@ -65,7 +81,8 @@ class Settings(BaseSettings):
 
     # ── v0.71: Generative video (self-hosted LTX-Video) ──────────────────────
     video_gen_enabled: bool = True
-    video_gen_provider: Literal["ltx", "stub"] = "ltx"
+    video_gen_provider: Literal["ltx", "fal", "stub"] = "ltx"
+    fal_video_model: str = "fal-ai/ltx-video"
     ltx_model_id: str = "Lightricks/LTX-Video"
     video_num_frames: int = 97
     video_fps: int = 24

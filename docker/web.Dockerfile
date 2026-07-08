@@ -13,6 +13,13 @@ FROM node:22-alpine AS builder
 WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
+# NEXT_PUBLIC_* are inlined into the client bundle at BUILD time — they must be
+# present here, not at runtime. Without a real API URL the browser falls back
+# to localhost:8000 and the whole app breaks on any remote host.
+ARG NEXT_PUBLIC_API_URL
+ARG NEXT_PUBLIC_DEMO_MODE=true
+ENV NEXT_PUBLIC_API_URL=$NEXT_PUBLIC_API_URL
+ENV NEXT_PUBLIC_DEMO_MODE=$NEXT_PUBLIC_DEMO_MODE
 ENV NEXT_TELEMETRY_DISABLED=1
 RUN npm run build --workspace=@roognis/web
 
