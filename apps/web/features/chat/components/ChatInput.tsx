@@ -95,16 +95,16 @@ export function ChatInput({ onSend, disabled, maxImages = 4 }: ChatInputProps) {
   }
 
   return (
-    <div className="flex flex-col gap-2 rounded-xl border border-input bg-background px-3 py-2 shadow-sm focus-within:ring-1 focus-within:ring-ring">
+    <div className="flex flex-col gap-2 rounded-[1.4rem] border border-border/70 bg-card/70 px-3 py-2.5 shadow-lg shadow-black/5 backdrop-blur-xl transition-all focus-within:border-primary/40 focus-within:shadow-primary/10 focus-within:ring-2 focus-within:ring-primary/15">
       {images.length > 0 && (
-        <div className="flex flex-wrap gap-2">
+        <div className="flex flex-wrap gap-2 px-1 pt-1">
           {images.map((img, i) => (
-            <div key={i} className="relative h-16 w-16 overflow-hidden rounded-lg border border-border">
+            <div key={i} className="relative h-16 w-16 overflow-hidden rounded-xl ring-1 ring-border">
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img src={img.previewUrl} alt={img.file.name} className="h-full w-full object-cover" />
               <button
                 onClick={() => removeImage(i)}
-                className="absolute right-0.5 top-0.5 rounded-full bg-background/80 p-0.5 text-foreground hover:bg-background"
+                className="absolute right-0.5 top-0.5 rounded-full bg-background/80 p-0.5 text-foreground backdrop-blur hover:bg-background"
                 aria-label={`Remove ${img.file.name}`}
               >
                 <X className="h-3 w-3" />
@@ -129,17 +129,17 @@ export function ChatInput({ onSend, disabled, maxImages = 4 }: ChatInputProps) {
         <button
           onClick={() => fileRef.current?.click()}
           disabled={disabled}
-          className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-accent hover:text-foreground disabled:opacity-40"
+          className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl text-muted-foreground transition-colors hover:bg-accent hover:text-foreground disabled:opacity-40"
           aria-label="Attach image"
         >
-          <ImagePlus className="h-4 w-4" />
+          <ImagePlus className="h-[18px] w-[18px]" />
         </button>
 
         <textarea
           ref={ref}
           rows={1}
           placeholder="Ask Roognis anything…"
-          className="flex-1 resize-none bg-transparent py-1 text-sm outline-none placeholder:text-muted-foreground disabled:opacity-50"
+          className="flex-1 resize-none bg-transparent py-2 text-sm leading-relaxed outline-none placeholder:text-muted-foreground/70 disabled:opacity-50"
           onKeyDown={handleKeyDown}
           onInput={handleInput}
           disabled={disabled}
@@ -150,11 +150,11 @@ export function ChatInput({ onSend, disabled, maxImages = 4 }: ChatInputProps) {
           onClick={submit}
           disabled={disabled}
           className={cn(
-            'flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-primary text-primary-foreground transition-opacity hover:opacity-90 disabled:opacity-40'
+            'flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-primary to-violet-500 text-primary-foreground shadow-md shadow-primary/25 transition-all hover:brightness-110 active:scale-95 disabled:opacity-40 disabled:shadow-none'
           )}
           aria-label="Send message"
         >
-          {disabled ? <Loader2 className="h-4 w-4 animate-spin" /> : <ArrowUp className="h-4 w-4" />}
+          {disabled ? <Loader2 className="h-[18px] w-[18px] animate-spin" /> : <ArrowUp className="h-[18px] w-[18px]" />}
         </button>
       </div>
     </div>

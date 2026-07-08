@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { PenSquare } from 'lucide-react'
+import { PenSquare, Sparkles } from 'lucide-react'
 import { useQuery } from '@tanstack/react-query'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { Separator } from '@/components/ui/separator'
@@ -11,6 +11,7 @@ import { studentApi } from '@/lib/api/student'
 import { useChatStore } from '@/lib/stores/chat.store'
 import { useChat } from '../hooks/useChat'
 import { ChatInput } from './ChatInput'
+import { ChatWelcome } from './ChatWelcome'
 import { MessageBubble } from './MessageBubble'
 import { SubjectList } from './SubjectList'
 import { ConversationList } from './ConversationList'
@@ -107,37 +108,39 @@ export function ChatView({ conversationId }: ChatViewProps) {
       </aside>
 
       {/* Chat window */}
-      <div className="flex flex-1 flex-col overflow-hidden">
-        {/* Subject/chapter header badge */}
-        {currentSubject && (
-          <div className="flex items-center gap-2 border-b border-border px-4 py-2">
-            <Badge variant="secondary" className="text-xs">
-              {currentSubject}
-            </Badge>
+      <div className="relative flex flex-1 flex-col overflow-hidden bg-background">
+        <div className="aurora" aria-hidden />
+
+        {/* Header */}
+        <div className="relative z-10 flex h-14 items-center gap-2 border-b border-border/60 px-5">
+          <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-gradient-to-br from-primary to-sky-500 shadow-sm shadow-primary/30">
+            <Sparkles className="h-3.5 w-3.5 text-white" />
+          </div>
+          <div className="flex min-w-0 flex-col">
+            <span className="truncate text-sm font-semibold leading-tight">
+              {currentSubject ?? 'Roognis Tutor'}
+            </span>
             {currentChapter && (
-              <Badge variant="outline" className="text-xs">
+              <span className="truncate text-[11px] leading-tight text-muted-foreground">
                 {currentChapter}
-              </Badge>
+              </span>
             )}
           </div>
-        )}
+          {currentSubject && (
+            <Badge variant="secondary" className="ml-auto gap-1 text-[10px]">
+              <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
+              Curriculum-scoped
+            </Badge>
+          )}
+        </div>
 
-        <ScrollArea className="flex-1 p-4">
+        <ScrollArea className="relative z-10 flex-1">
           {messages.length === 0 && !streaming ? (
-            <div className="flex h-full flex-col items-center justify-center gap-2 text-center">
-              <p className="text-lg font-medium">
-                {currentSubject
-                  ? `Ask anything about ${currentSubject}`
-                  : 'What would you like to learn today?'}
-              </p>
-              <p className="text-sm text-muted-foreground">
-                {currentSubject
-                  ? `Start a conversation about ${currentChapter ?? currentSubject}.`
-                  : 'Select a subject or start a new chat to begin.'}
-              </p>
+            <div className="h-[calc(100vh-8.5rem)]">
+              <ChatWelcome subject={currentSubject} chapter={currentChapter} onPick={sendMessage} />
             </div>
           ) : (
-            <div className="mx-auto flex max-w-3xl flex-col gap-4 pb-4">
+            <div className="mx-auto flex max-w-3xl flex-col gap-6 px-4 py-6">
               {messages.map((msg) => (
                 <MessageBubble key={msg.id} message={msg} />
               ))}
@@ -162,10 +165,10 @@ export function ChatView({ conversationId }: ChatViewProps) {
         </ScrollArea>
 
         {/* Input */}
-        <div className="border-t border-border p-4">
+        <div className="relative z-10 px-4 pb-4 pt-2">
           <div className="mx-auto max-w-3xl">
             <ChatInput onSend={sendMessage} disabled={isStreaming} />
-            <p className="mt-2 text-center text-xs text-muted-foreground">
+            <p className="mt-2 text-center text-[11px] text-muted-foreground/70">
               Roognis may make mistakes. Verify important information.
             </p>
           </div>
