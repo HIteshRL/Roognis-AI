@@ -2,7 +2,7 @@
 Tests for /rag/* endpoints — curriculum-filtered RAG API.
 """
 import os
-from datetime import datetime
+from datetime import UTC, datetime
 from unittest.mock import AsyncMock
 
 import pytest
@@ -33,8 +33,8 @@ def _admin_user():
         is_active=True,
         is_verified=True,
         is_admin=True,
-        created_at=datetime.utcnow().isoformat(),
-        updated_at=datetime.utcnow().isoformat(),
+        created_at=datetime.now(UTC).isoformat(),
+        updated_at=datetime.now(UTC).isoformat(),
     )
 
 
@@ -46,8 +46,8 @@ def _student_user():
         is_active=True,
         is_verified=True,
         is_admin=False,
-        created_at=datetime.utcnow().isoformat(),
-        updated_at=datetime.utcnow().isoformat(),
+        created_at=datetime.now(UTC).isoformat(),
+        updated_at=datetime.now(UTC).isoformat(),
     )
 
 
@@ -143,8 +143,8 @@ async def test_rag_status_returns_job():
         status="done",
         progress=100,
         error_message=None,
-        created_at=datetime.utcnow().isoformat(),
-        updated_at=datetime.utcnow().isoformat(),
+        created_at=datetime.now(UTC).isoformat(),
+        updated_at=datetime.now(UTC).isoformat(),
     ))
 
     app.dependency_overrides[dependencies.get_current_user] = lambda: _student_user()

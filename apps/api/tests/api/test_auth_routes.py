@@ -1,5 +1,5 @@
 ﻿import os
-from datetime import datetime
+from datetime import UTC, datetime
 from unittest.mock import AsyncMock
 
 import pytest
@@ -23,8 +23,8 @@ def _mock_user_response():
         username="testuser",
         is_active=True,
         is_verified=False,
-        created_at=datetime.utcnow().isoformat(),
-        updated_at=datetime.utcnow().isoformat(),
+        created_at=datetime.now(UTC).isoformat(),
+        updated_at=datetime.now(UTC).isoformat(),
     )
 
 
