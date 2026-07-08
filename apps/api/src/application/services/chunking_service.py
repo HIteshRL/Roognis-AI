@@ -235,6 +235,8 @@ class ChunkingService:
 
     async def _adjacent_similarities(self, atoms: list[_Atom]) -> list[float]:
         """Cosine between each atom and its predecessor (sims[0] unused)."""
+        if self._embedder is None:
+            return [1.0] * len(atoms)
         result = await self._embedder.embed([a.text for a in atoms])
         vecs = result.vectors
         sims = [1.0]

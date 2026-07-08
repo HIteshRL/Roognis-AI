@@ -185,7 +185,6 @@ async def test_strengths_from_mastery(svc, repos):
 @pytest.mark.asyncio
 async def test_engagement_streak(svc, repos):
     session_repo, mastery_repo, gap_repo = repos
-    now = datetime.now(UTC)
     sessions = [_session(days_ago=i) for i in range(5)]
     session_repo.list_since.return_value = sessions
     session_repo.count_by_user.return_value = 5

@@ -93,13 +93,23 @@ async def send_message(
 
     async def run_learning_pipeline():
         ai_text = "".join(collected_response)
+        # Follow-up turns omit subject/chapter (only new conversations send
+        # them), so fall back to the conversation's persisted scope — otherwise
+        # sessions/mastery/gaps get recorded with no subject/chapter.
+        pipe_subject, pipe_chapter = subject, chapter
+        if conversation_id and (pipe_subject is None or pipe_chapter is None):
+            stored_subject, stored_chapter = await chat_svc.get_conversation_scope(
+                user_id, conversation_id
+            )
+            pipe_subject = pipe_subject or stored_subject
+            pipe_chapter = pipe_chapter or stored_chapter
         await orchestrator.process(
             user_id=user_id,
             question=question,
             ai_response=ai_text,
             conversation_id=conversation_id,
-            subject=subject,
-            chapter=chapter,
+            subject=pipe_subject,
+            chapter=pipe_chapter,
             intent=current_intent,
         )
 

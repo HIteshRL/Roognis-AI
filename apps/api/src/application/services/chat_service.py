@@ -298,6 +298,20 @@ class ChatService:
         rows = await self._conversations.chapter_counts(user_id, subject)
         return [(chapter, count) for chapter, count in rows if chapter]
 
+    async def get_conversation_scope(
+        self, user_id: UUID, conversation_id: UUID
+    ) -> tuple[str | None, str | None]:
+        """The persisted (subject, chapter) for a conversation the user owns.
+
+        Follow-up chat turns send only conversation_id — subject/chapter are
+        absent from the request — so the learning pipeline must read the stored
+        scope rather than the empty payload. Returns (None, None) if the
+        conversation is missing or not owned by the user (fail-open)."""
+        conv = await self._conversations.get_by_id(conversation_id)
+        if not conv or conv.user_id != user_id:
+            return None, None
+        return conv.subject, conv.chapter
+
     async def get_conversation(
         self, user_id: UUID, conversation_id: UUID
     ) -> ConversationWithMessagesResponse:

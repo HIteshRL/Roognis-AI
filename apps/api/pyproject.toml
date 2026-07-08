@@ -81,9 +81,36 @@ ignore = [
   "E501",
 ]
 
+[tool.ruff.lint.flake8-bugbear]
+# FastAPI idiom: calling Depends()/Query()/etc in argument defaults is correct,
+# not a mutable-default bug. Whitelist them so B008 doesn't fire.
+extend-immutable-calls = [
+  "fastapi.Depends",
+  "fastapi.Query",
+  "fastapi.Path",
+  "fastapi.Body",
+  "fastapi.Header",
+  "fastapi.Cookie",
+  "fastapi.Form",
+  "fastapi.File",
+  "fastapi.Security",
+]
+
 [tool.ruff.lint.per-file-ignores]
 "src/infrastructure/database/migrations/*" = ["E501"]
 "src/infrastructure/database/models/*" = ["E501"]
+# Test fixtures set os.environ before importing app modules — imports can't be at top.
+"tests/conftest.py" = ["E402"]
+"tests/api/test_rag_routes.py" = ["E402"]
+
+[tool.mypy]
+# The app is imported as `from src...`, and the editable install also exposes
+# `src` as a top-level package. Pin the base to this dir so `mypy src` resolves
+# every file as `src.<module>` (one name), avoiding "found twice" clashes.
+mypy_path = "."
+explicit_package_bases = true
+namespace_packages = true
+ignore_missing_imports = true
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
