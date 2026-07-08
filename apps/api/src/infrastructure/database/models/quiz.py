@@ -68,7 +68,41 @@ class QuizQuestionModel(Base, UUIDMixin):
         String(10), nullable=False, default="medium"
     )
     position: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    bank_question_id: Mapped[str | None] = mapped_column(
+        UUID(as_uuid=False), nullable=True
+    )
     created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+
+class QuestionBankModel(Base, UUIDMixin):
+    __tablename__ = "question_bank"
+
+    concept_id: Mapped[str | None] = mapped_column(
+        UUID(as_uuid=False),
+        ForeignKey("concept_nodes.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
+    concept_name: Mapped[str] = mapped_column(String(200), nullable=False)
+    question_text: Mapped[str] = mapped_column(Text, nullable=False)
+    question_type: Mapped[str] = mapped_column(String(20), nullable=False, default="mcq")
+    options: Mapped[list] = mapped_column(JSONB, nullable=True, default=list)
+    correct_answer: Mapped[str] = mapped_column(Text, nullable=False, default="")
+    explanation: Mapped[str] = mapped_column(Text, nullable=False, default="")
+    bloom_level: Mapped[str] = mapped_column(String(20), nullable=False, default="Understand")
+    difficulty: Mapped[str] = mapped_column(String(10), nullable=False, default="medium")
+    difficulty_rating: Mapped[float] = mapped_column(Float, nullable=False, default=1200.0)
+    times_served: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    times_correct: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    version: Mapped[int] = mapped_column(Integer, nullable=False, default=1)
+    source: Mapped[str] = mapped_column(String(20), nullable=False, default="llm")
+    is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+    updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )
 

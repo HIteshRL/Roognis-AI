@@ -109,6 +109,7 @@ def _to_mastery(m: MasteryRecordModel) -> MasteryRecord:
     r.concept_name = m.concept_name
     r.score = m.score
     r.interaction_count = m.interaction_count
+    r.ability_rating = m.ability_rating
     r.last_updated = m.last_updated
     r.created_at = m.created_at
     return r
@@ -437,6 +438,7 @@ class MasteryRepository(AbstractMasteryRepository):
         m = result.scalar_one()
         m.score = record.score
         m.interaction_count = record.interaction_count
+        m.ability_rating = record.ability_rating
         m.last_updated = record.last_updated
         await self._db.flush()
         await self._db.refresh(m)

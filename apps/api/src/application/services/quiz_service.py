@@ -3,12 +3,15 @@ from uuid import UUID
 
 import structlog
 
+from src.application.services.ability_engine import AbilityEngine
+from src.domain.entities.learning import MasteryRecord
 from src.domain.entities.quiz import Quiz, QuizAttempt, QuizQuestion, QuizResponse
 from src.domain.repositories.learning_repository import (
     AbstractConceptNodeRepository,
     AbstractMasteryRepository,
 )
 from src.domain.repositories.quiz_repository import (
+    AbstractQuestionBankRepository,
     AbstractQuizAttemptRepository,
     AbstractQuizQuestionRepository,
     AbstractQuizRepository,
@@ -27,6 +30,8 @@ class QuizService:
         response_repo: AbstractQuizResponseRepository,
         mastery_repo: AbstractMasteryRepository,
         concept_repo: AbstractConceptNodeRepository,
+        bank_repo: AbstractQuestionBankRepository | None = None,
+        ability_engine: AbilityEngine | None = None,
     ) -> None:
         self._quizzes = quiz_repo
         self._questions = question_repo
@@ -34,6 +39,8 @@ class QuizService:
         self._responses = response_repo
         self._mastery = mastery_repo
         self._concepts = concept_repo
+        self._bank = bank_repo
+        self._ability = ability_engine
 
     async def create_quiz(
         self,
@@ -233,12 +240,17 @@ class QuizService:
                 record.apply_interaction(
                     question.bloom_level, has_misconception=not is_correct
                 )
+                # Elo ability update runs in parallel with the mastery score
+                # (build-on-top — neither replaces the other), reusing this
+                # record's single write.
+                await self._apply_ability(record, question, is_correct)
                 await self._mastery.update(record)
                 logger.debug(
                     "mastery_updated_from_quiz",
                     concept=question.concept_name,
                     correct=is_correct,
                     new_score=record.score,
+                    ability=record.ability_rating,
                 )
             except Exception as exc:
                 logger.warning(
@@ -246,3 +258,25 @@ class QuizService:
                     concept=question.concept_name,
                     error=str(exc),
                 )
+
+    async def _apply_ability(
+        self, record: MasteryRecord, question: QuizQuestion, is_correct: bool
+    ) -> None:
+        """Nudge the student's per-concept θ and the question's difficulty
+        rating against each other (Elo). Fail-open: any issue leaves the
+        mastery-score path untouched."""
+        if not (self._ability and self._bank and question.bank_question_id):
+            return
+        try:
+            banked = await self._bank.get_by_id(question.bank_question_id)
+            if banked is None:
+                return
+            update = self._ability.update(
+                record.ability_rating, banked.difficulty_rating, is_correct
+            )
+            record.ability_rating = update.student_rating
+            banked.difficulty_rating = update.question_rating
+            banked.record_outcome(is_correct)
+            await self._bank.update_stats(banked)
+        except Exception as exc:
+            logger.warning("ability_update_failed", error=str(exc))

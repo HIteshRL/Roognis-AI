@@ -5,11 +5,18 @@ import structlog
 from groq import AsyncGroq
 
 from src.domain.entities.learning import ConceptNode, MasteryRecord
-from src.domain.entities.quiz import Quiz, QuizQuestion
+from src.domain.entities.quiz import (
+    DEFAULT_RATING,
+    DIFFICULTY_RATINGS,
+    BankedQuestion,
+    Quiz,
+    QuizQuestion,
+)
 from src.domain.repositories.learning_repository import (
     AbstractConceptNodeRepository,
     AbstractMasteryRepository,
 )
+from src.domain.repositories.quiz_repository import AbstractQuestionBankRepository
 
 logger = structlog.get_logger(__name__)
 
@@ -54,10 +61,12 @@ class QuizGenerationService:
         groq_client: AsyncGroq,
         mastery_repo: AbstractMasteryRepository,
         concept_repo: AbstractConceptNodeRepository,
+        bank_repo: AbstractQuestionBankRepository | None = None,
     ) -> None:
         self._groq = groq_client
         self._mastery = mastery_repo
         self._concepts = concept_repo
+        self._bank = bank_repo
 
     async def generate(
         self,
@@ -85,11 +94,6 @@ class QuizGenerationService:
             return quiz, []
 
         mastery_map = await self._get_mastery_map(user_id, concepts)
-        concept_descriptions = self._build_concept_prompt(
-            concepts, mastery_map, difficulty
-        )
-
-        raw_questions = await self._call_llm(concept_descriptions, question_count)
 
         quiz = Quiz(
             user_id=user_id,
@@ -97,16 +101,85 @@ class QuizGenerationService:
             subject=subject,
             chapter=chapter,
             difficulty=difficulty,
-            question_count=len(raw_questions),
         )
-
         concept_id_map = {c.name.lower(): c.id for c in concepts}
-        questions = []
-        for i, q_data in enumerate(raw_questions):
-            cname = q_data.get("concept_name", "")
+
+        # 1) Reuse banked questions near the student's ability first.
+        banked = await self._pull_from_bank(concepts, mastery_map, question_count)
+
+        # 2) Generate only what the bank couldn't supply.
+        remaining = question_count - len(banked)
+        new_banked: list[BankedQuestion] = []
+        if remaining > 0:
+            concept_descriptions = self._build_concept_prompt(concepts, mastery_map, difficulty)
+            raw_questions = await self._call_llm(concept_descriptions, remaining)
+            new_banked = self._raw_to_banked(raw_questions, concept_id_map)
+            # Persist newly-generated items so the next quiz can reuse them.
+            if self._bank and new_banked:
+                try:
+                    new_banked = await self._bank.create_many(new_banked)
+                except Exception as exc:
+                    logger.warning("question_bank_persist_failed", error=str(exc))
+
+        linked = self._bank is not None
+        questions: list[QuizQuestion] = []
+        for i, b in enumerate(banked):
+            questions.append(self._banked_to_quiz_question(b, quiz.id, i, linked=True))
+        for j, b in enumerate(new_banked):
             questions.append(
-                QuizQuestion(
-                    quiz_id=quiz.id,
+                self._banked_to_quiz_question(b, quiz.id, len(banked) + j, linked=linked)
+            )
+        quiz.question_count = len(questions)
+
+        logger.info(
+            "quiz_generated",
+            user_id=str(user_id),
+            concepts=len(concepts),
+            questions=len(questions),
+            reused=len(banked),
+            generated=len(new_banked),
+        )
+        return quiz, questions
+
+    async def _pull_from_bank(
+        self,
+        concepts: list[ConceptNode],
+        mastery_map: dict[UUID, MasteryRecord],
+        total: int,
+    ) -> list[BankedQuestion]:
+        """Fetch banked questions whose difficulty rating is closest to the
+        student's per-concept ability θ (maximum-information selection)."""
+        if not self._bank:
+            return []
+        per = max(1, total // max(1, len(concepts)))
+        picked: list[BankedQuestion] = []
+        seen: set[UUID] = set()
+        for c in concepts:
+            record = mastery_map.get(c.id)
+            theta = record.ability_rating if record and record.ability_rating is not None else DEFAULT_RATING
+            try:
+                items = await self._bank.list_for_concept(c.id, near_rating=theta, limit=per)
+            except Exception as exc:
+                logger.warning("question_bank_read_failed", error=str(exc))
+                continue
+            for it in items:
+                if it.id not in seen:
+                    picked.append(it)
+                    seen.add(it.id)
+            if len(picked) >= total:
+                break
+        return picked[:total]
+
+    @staticmethod
+    def _raw_to_banked(
+        raw_questions: list[dict], concept_id_map: dict[str, UUID]
+    ) -> list[BankedQuestion]:
+        banked: list[BankedQuestion] = []
+        for q_data in raw_questions:
+            cname = q_data.get("concept_name", "")
+            diff = q_data.get("difficulty", "medium")
+            banked.append(
+                BankedQuestion(
                     concept_name=cname,
                     concept_id=concept_id_map.get(cname.lower()),
                     question_text=q_data.get("question_text", ""),
@@ -115,18 +188,30 @@ class QuizGenerationService:
                     correct_answer=q_data.get("correct_answer", ""),
                     explanation=q_data.get("explanation", ""),
                     bloom_level=q_data.get("bloom_level", "Understand"),
-                    difficulty=q_data.get("difficulty", "medium"),
-                    position=i,
+                    difficulty=diff,
+                    difficulty_rating=DIFFICULTY_RATINGS.get(diff, DEFAULT_RATING),
                 )
             )
+        return banked
 
-        logger.info(
-            "quiz_generated",
-            user_id=str(user_id),
-            concepts=len(concepts),
-            questions=len(questions),
+    @staticmethod
+    def _banked_to_quiz_question(
+        b: BankedQuestion, quiz_id: UUID, position: int, linked: bool
+    ) -> QuizQuestion:
+        return QuizQuestion(
+            quiz_id=quiz_id,
+            concept_name=b.concept_name,
+            concept_id=b.concept_id,
+            question_text=b.question_text,
+            question_type=b.question_type,
+            options=b.options,
+            correct_answer=b.correct_answer,
+            explanation=b.explanation,
+            bloom_level=b.bloom_level,
+            difficulty=b.difficulty,
+            position=position,
+            bank_question_id=b.id if linked else None,
         )
-        return quiz, questions
 
     async def _resolve_concepts(
         self,

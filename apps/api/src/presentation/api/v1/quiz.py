@@ -16,8 +16,12 @@ from src.application.dtos.quiz import (
 from src.application.dtos.user import UserResponse
 from src.application.interfaces.dependencies import (
     get_current_user,
+    get_learning_velocity_service,
     get_quiz_generation_service,
     get_quiz_service,
+)
+from src.application.services.learning_velocity_service import (
+    LearningVelocityService,
 )
 from src.application.services.quiz_generation_service import (
     QuizGenerationService,
@@ -130,6 +134,47 @@ async def quiz_history(
         ],
         request_id=request.state.request_id,
     )
+
+
+@router.post("/review", response_model=None)
+async def review_quiz(
+    request: Request,
+    current_user: Annotated[UserResponse, Depends(get_current_user)],
+    velocity_svc: Annotated[
+        LearningVelocityService, Depends(get_learning_velocity_service)
+    ],
+    gen_svc: Annotated[QuizGenerationService, Depends(get_quiz_generation_service)],
+    quiz_svc: Annotated[QuizService, Depends(get_quiz_service)],
+    question_count: int = Query(default=5, ge=1, le=20),
+):
+    """Spaced-repetition entry point: build a quiz from the concepts most at
+    risk of being forgotten (retention risk), targeting the student's ability."""
+    user_id = UUID(current_user.id)
+    risks = await velocity_svc.compute_retention_risks(user_id)
+    if not risks:
+        return ok(
+            None,
+            message="Nothing is due for review — keep learning!",
+            request_id=request.state.request_id,
+        )
+
+    concept_ids = [r.concept_id for r in risks[:question_count]]
+    quiz, questions = await gen_svc.generate(
+        user_id=user_id,
+        concept_ids=concept_ids,
+        question_count=question_count,
+        difficulty="adaptive",
+    )
+    if not questions:
+        return ok(
+            None,
+            message="Could not build a review quiz right now",
+            request_id=request.state.request_id,
+        )
+
+    quiz.title = "Review — concepts due for reinforcement"
+    saved_quiz = await quiz_svc.create_quiz(quiz, questions)
+    return ok(_quiz_summary(saved_quiz), request_id=request.state.request_id)
 
 
 @router.get("/{quiz_id}", response_model=None)

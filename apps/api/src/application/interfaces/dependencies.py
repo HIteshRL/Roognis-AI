@@ -10,6 +10,7 @@ from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
 from src.application.dtos.user import UserResponse
+from src.application.services.ability_engine import AbilityEngine
 from src.application.services.attachment_service import AttachmentService
 from src.application.services.auth_service import AuthService
 from src.application.services.caching_engine import CachingEngine
@@ -92,6 +93,7 @@ from src.infrastructure.database.repositories.psychometric_repository import (
     PsychometricRepository,
 )
 from src.infrastructure.database.repositories.quiz_repository import (
+    QuestionBankRepository,
     QuizAttemptRepository,
     QuizQuestionRepository,
     QuizRepository,
@@ -562,6 +564,7 @@ def get_quiz_generation_service(
         groq_client=AsyncGroq(api_key=settings.groq_api_key),
         mastery_repo=MasteryRepository(db),
         concept_repo=ConceptNodeRepository(db),
+        bank_repo=QuestionBankRepository(db),
     )
 
 
@@ -575,6 +578,8 @@ def get_quiz_service(
         response_repo=QuizResponseRepository(db),
         mastery_repo=MasteryRepository(db),
         concept_repo=ConceptNodeRepository(db),
+        bank_repo=QuestionBankRepository(db),
+        ability_engine=AbilityEngine(),
     )
 
 

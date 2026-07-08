@@ -4,18 +4,21 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.domain.entities.quiz import (
+    BankedQuestion,
     Quiz,
     QuizAttempt,
     QuizQuestion,
     QuizResponse,
 )
 from src.domain.repositories.quiz_repository import (
+    AbstractQuestionBankRepository,
     AbstractQuizAttemptRepository,
     AbstractQuizQuestionRepository,
     AbstractQuizRepository,
     AbstractQuizResponseRepository,
 )
 from src.infrastructure.database.models.quiz import (
+    QuestionBankModel,
     QuizAttemptModel,
     QuizModel,
     QuizQuestionModel,
@@ -55,8 +58,32 @@ def _to_question(m: QuizQuestionModel) -> QuizQuestion:
     q.bloom_level = m.bloom_level
     q.difficulty = m.difficulty
     q.position = m.position
+    q.bank_question_id = UUID(m.bank_question_id) if m.bank_question_id else None
     q.created_at = m.created_at
     return q
+
+
+def _to_banked(m: QuestionBankModel) -> BankedQuestion:
+    b = BankedQuestion.__new__(BankedQuestion)
+    b.id = UUID(m.id)
+    b.concept_id = UUID(m.concept_id) if m.concept_id else None
+    b.concept_name = m.concept_name
+    b.question_text = m.question_text
+    b.question_type = m.question_type
+    b.options = list(m.options or [])
+    b.correct_answer = m.correct_answer
+    b.explanation = m.explanation
+    b.bloom_level = m.bloom_level
+    b.difficulty = m.difficulty
+    b.difficulty_rating = m.difficulty_rating
+    b.times_served = m.times_served
+    b.times_correct = m.times_correct
+    b.version = m.version
+    b.source = m.source
+    b.is_active = m.is_active
+    b.created_at = m.created_at
+    b.updated_at = m.updated_at
+    return b
 
 
 def _to_attempt(m: QuizAttemptModel) -> QuizAttempt:
@@ -191,6 +218,7 @@ class QuizQuestionRepository(AbstractQuizQuestionRepository):
                 bloom_level=q.bloom_level,
                 difficulty=q.difficulty,
                 position=q.position,
+                bank_question_id=str(q.bank_question_id) if q.bank_question_id else None,
             )
             self._db.add(m)
             models.append(m)
@@ -286,3 +314,83 @@ class QuizResponseRepository(AbstractQuizResponseRepository):
             )
         )
         return [_to_response(m) for m in result.scalars().all()]
+
+
+class QuestionBankRepository(AbstractQuestionBankRepository):
+    def __init__(self, db: AsyncSession) -> None:
+        self._db = db
+
+    async def create_many(self, questions: list[BankedQuestion]) -> list[BankedQuestion]:
+        models = []
+        for q in questions:
+            m = QuestionBankModel(
+                id=str(q.id),
+                concept_id=str(q.concept_id) if q.concept_id else None,
+                concept_name=q.concept_name,
+                question_text=q.question_text,
+                question_type=q.question_type,
+                options=q.options,
+                correct_answer=q.correct_answer,
+                explanation=q.explanation,
+                bloom_level=q.bloom_level,
+                difficulty=q.difficulty,
+                difficulty_rating=q.difficulty_rating,
+                version=q.version,
+                source=q.source,
+                is_active=q.is_active,
+            )
+            self._db.add(m)
+            models.append(m)
+        await self._db.flush()
+        for m in models:
+            await self._db.refresh(m)
+        return [_to_banked(m) for m in models]
+
+    async def get_by_id(self, question_id: UUID) -> BankedQuestion | None:
+        result = await self._db.execute(
+            select(QuestionBankModel).where(QuestionBankModel.id == str(question_id))
+        )
+        m = result.scalar_one_or_none()
+        return _to_banked(m) if m else None
+
+    async def list_for_concept(
+        self, concept_id: UUID, near_rating: float | None = None, limit: int = 5
+    ) -> list[BankedQuestion]:
+        """Active banked questions for a concept. When near_rating is given,
+        return the items whose difficulty_rating is closest to it (maximum-
+        information selection); otherwise most-recently-added first."""
+        stmt = select(QuestionBankModel).where(
+            QuestionBankModel.concept_id == str(concept_id),
+            QuestionBankModel.is_active.is_(True),
+        )
+        if near_rating is not None:
+            stmt = stmt.order_by(
+                func.abs(QuestionBankModel.difficulty_rating - near_rating)
+            )
+        else:
+            stmt = stmt.order_by(QuestionBankModel.created_at.desc())
+        stmt = stmt.limit(limit)
+        result = await self._db.execute(stmt)
+        return [_to_banked(m) for m in result.scalars().all()]
+
+    async def count_for_concept(self, concept_id: UUID) -> int:
+        result = await self._db.execute(
+            select(func.count(QuestionBankModel.id)).where(
+                QuestionBankModel.concept_id == str(concept_id),
+                QuestionBankModel.is_active.is_(True),
+            )
+        )
+        return result.scalar_one()
+
+    async def update_stats(self, question: BankedQuestion) -> None:
+        result = await self._db.execute(
+            select(QuestionBankModel).where(QuestionBankModel.id == str(question.id))
+        )
+        m = result.scalar_one_or_none()
+        if m is None:
+            return
+        m.difficulty_rating = question.difficulty_rating
+        m.times_served = question.times_served
+        m.times_correct = question.times_correct
+        m.updated_at = question.updated_at
+        await self._db.flush()

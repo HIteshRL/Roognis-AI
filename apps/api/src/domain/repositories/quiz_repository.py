@@ -1,7 +1,13 @@
 from abc import ABC, abstractmethod
 from uuid import UUID
 
-from src.domain.entities.quiz import Quiz, QuizAttempt, QuizQuestion, QuizResponse
+from src.domain.entities.quiz import (
+    BankedQuestion,
+    Quiz,
+    QuizAttempt,
+    QuizQuestion,
+    QuizResponse,
+)
 
 
 class AbstractQuizRepository(ABC):
@@ -56,3 +62,22 @@ class AbstractQuizResponseRepository(ABC):
 
     @abstractmethod
     async def list_by_attempt(self, attempt_id: UUID) -> list[QuizResponse]: ...
+
+
+class AbstractQuestionBankRepository(ABC):
+    @abstractmethod
+    async def create_many(self, questions: list[BankedQuestion]) -> list[BankedQuestion]: ...
+
+    @abstractmethod
+    async def get_by_id(self, question_id: UUID) -> BankedQuestion | None: ...
+
+    @abstractmethod
+    async def list_for_concept(
+        self, concept_id: UUID, near_rating: float | None = None, limit: int = 5
+    ) -> list[BankedQuestion]: ...
+
+    @abstractmethod
+    async def count_for_concept(self, concept_id: UUID) -> int: ...
+
+    @abstractmethod
+    async def update_stats(self, question: BankedQuestion) -> None: ...
