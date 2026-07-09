@@ -6,6 +6,7 @@ import structlog
 from src.application.services.ability_engine import AbilityEngine
 from src.domain.entities.learning import MasteryRecord
 from src.domain.entities.quiz import Quiz, QuizAttempt, QuizQuestion, QuizResponse
+from src.domain.exceptions import EntityNotFound
 from src.domain.repositories.learning_repository import (
     AbstractConceptNodeRepository,
     AbstractMasteryRepository,
@@ -84,6 +85,13 @@ class QuizService:
     async def start_attempt(
         self, user_id: UUID, quiz_id: UUID
     ) -> QuizAttempt:
+        # Ownership check — without it, a user who guesses another user's quiz
+        # UUID could create their own attempt and then read that quiz's
+        # questions, answers, and explanations via the results endpoint.
+        quiz = await self._quizzes.get_by_id(quiz_id)
+        if not quiz or quiz.user_id != user_id:
+            raise EntityNotFound("Quiz not found")
+
         attempt = QuizAttempt(user_id=user_id, quiz_id=quiz_id)
         saved = await self._attempts.create(attempt)
         logger.info(

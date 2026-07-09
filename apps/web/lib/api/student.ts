@@ -244,8 +244,10 @@ export const studentApi = {
     difficulty?: string
   }) => apiClient.post<import('@roognis/shared').QuizSummaryDto>('/api/v1/student/quiz/generate', body),
 
+  // Backend paginated() puts the array at top-level `data` (pagination in
+  // `meta`), so apiClient.get returns ApiResponse<QuizSummaryDto[]>.
   getQuizzes: (page = 1, limit = 20, subject?: string) =>
-    apiClient.get<{ data: import('@roognis/shared').QuizSummaryDto[]; pagination: { total: number; page: number; limit: number } }>(
+    apiClient.get<import('@roognis/shared').QuizSummaryDto[]>(
       `/api/v1/student/quiz?page=${page}&limit=${limit}${subject ? `&subject=${encodeURIComponent(subject)}` : ''}`
     ),
 

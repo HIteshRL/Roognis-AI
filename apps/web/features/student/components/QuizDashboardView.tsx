@@ -41,7 +41,7 @@ export function QuizDashboardView() {
     select: (r) => r.data,
   })
 
-  const quizzes: QuizSummaryDto[] = quizzesData?.data ?? []
+  const quizzes: QuizSummaryDto[] = quizzesData ?? []
   const history = historyData ?? []
 
   const generate = useMutation({
