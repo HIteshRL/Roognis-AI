@@ -1,8 +1,9 @@
 """Unit tests for LearnerBehaviorService — Phase 0.3 behavioral analysis."""
-import pytest
 from datetime import UTC, datetime, timedelta
 from unittest.mock import AsyncMock
 from uuid import uuid4
+
+import pytest
 
 from src.application.services.learner_behavior_service import LearnerBehaviorService
 from src.domain.entities.learning import LearningGap, LearningSession, MasteryRecord
@@ -184,7 +185,6 @@ async def test_strengths_from_mastery(svc, repos):
 @pytest.mark.asyncio
 async def test_engagement_streak(svc, repos):
     session_repo, mastery_repo, gap_repo = repos
-    now = datetime.now(UTC)
     sessions = [_session(days_ago=i) for i in range(5)]
     session_repo.list_since.return_value = sessions
     session_repo.count_by_user.return_value = 5

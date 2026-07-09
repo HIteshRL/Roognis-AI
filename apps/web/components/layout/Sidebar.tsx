@@ -2,32 +2,50 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { UserButton } from '@clerk/nextjs'
+import { AccountButton } from '@/components/layout/AccountButton'
 import {
   AlertTriangle,
   BookOpen,
   BrainCircuit,
   BarChart3,
+  ClipboardCheck,
   GitBranch,
+  GraduationCap,
   LayoutDashboard,
   Lightbulb,
   Map,
   MessageSquare,
   Network,
+  School,
   Settings,
+  Shield,
   Sparkles,
   User,
+  Users,
 } from 'lucide-react'
+import { useQuery } from '@tanstack/react-query'
+import { authApi } from '@/lib/api/auth'
 import { cn } from '@/lib/utils'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { Separator } from '@/components/ui/separator'
 
-const mainNavItems = [
+// `requires` gates a link to a capability; undefined = visible to everyone.
+type Capability = 'staff' | 'parent' | 'admin'
+
+const mainNavItems: {
+  href: string
+  icon: typeof LayoutDashboard
+  label: string
+  requires?: Capability
+}[] = [
   { href: '/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
   { href: '/chat', icon: MessageSquare, label: 'Chat' },
+  { href: '/student/classes', icon: GraduationCap, label: 'My Classes' },
   { href: '/profile', icon: User, label: 'Profile' },
   { href: '/settings', icon: Settings, label: 'Settings' },
-  { href: '/admin', icon: BookOpen, label: 'Admin' },
+  { href: '/teacher', icon: School, label: 'Teacher Portal', requires: 'staff' },
+  { href: '/parent', icon: Users, label: 'Parent Portal', requires: 'parent' },
+  { href: '/admin', icon: BookOpen, label: 'Admin', requires: 'admin' },
 ]
 
 const learningNavItems = [
@@ -37,13 +55,36 @@ const learningNavItems = [
   { href: '/student/recommendations', icon: Lightbulb, label: 'Next Up' },
   { href: '/student/learning-path', icon: Map, label: 'Learning Path' },
   { href: '/student/skills', icon: Sparkles, label: 'Skills' },
+  { href: '/student/quiz', icon: ClipboardCheck, label: 'Quizzes' },
   { href: '/student/graph', icon: Network, label: 'Knowledge Map' },
   { href: '/student/timeline', icon: GitBranch, label: 'Timeline' },
   { href: '/student/statistics', icon: BarChart3, label: 'Statistics' },
+  { href: '/student/guardians', icon: Shield, label: 'Family Access' },
 ]
 
 export function Sidebar() {
   const pathname = usePathname()
+
+  const { data: me } = useQuery({
+    queryKey: ['auth', 'me'],
+    queryFn: () => authApi.me(),
+    select: (r) => r.data,
+    staleTime: 5 * 60 * 1000,
+    retry: false,
+  })
+
+  // Default to the least-privileged view until we know the role, so students
+  // never see teacher/parent/admin links (design-critique #4).
+  const role = me?.role ?? 'student'
+  const isAdmin = me?.is_admin ?? false
+  const can = (requires?: Capability) => {
+    if (!requires) return true
+    if (requires === 'admin') return isAdmin
+    if (requires === 'staff') return isAdmin || role === 'teacher' || role === 'school_admin'
+    if (requires === 'parent') return isAdmin || role === 'parent'
+    return true
+  }
+  const visibleMainNav = mainNavItems.filter((item) => can(item.requires))
 
   const isActive = (href: string) =>
     href === '/student'
@@ -64,7 +105,7 @@ export function Sidebar() {
       {/* Navigation */}
       <ScrollArea className="flex-1 py-2">
         <nav className="flex flex-col gap-0.5 px-2">
-          {mainNavItems.map(({ href, icon: Icon, label }) => (
+          {visibleMainNav.map(({ href, icon: Icon, label }) => (
             <Link
               key={href}
               href={href}
@@ -107,8 +148,7 @@ export function Sidebar() {
       {/* User */}
       <Separator />
       <div className="flex items-center gap-3 p-4">
-        <UserButton afterSignOutUrl="/login" />
-        <span className="text-sm text-muted-foreground">Account</span>
+        <AccountButton />
       </div>
     </aside>
   )

@@ -4,17 +4,13 @@
 All query endpoints enforce strict academic hierarchy filtering.
 The LLM answers ONLY from retrieved curriculum context.
 """
-from typing import Annotated
 from uuid import UUID
 
-from fastapi import APIRouter, BackgroundTasks, Depends, File, Form, Query, Request, UploadFile
+from fastapi import APIRouter, BackgroundTasks, Depends, File, Form, Request, UploadFile
 
 from src.application.dtos.knowledge import (
-    CurriculumFilter,
     DocumentUploadResponse,
-    IngestionJobResponse,
     RagQueryRequest,
-    RagQueryResponse,
 )
 from src.application.dtos.user import UserResponse
 from src.application.interfaces.dependencies import (
@@ -42,6 +38,11 @@ def _make_pipeline(settings: Settings) -> IngestionPipeline:
         chunk_size=settings.chunk_size,
         chunk_overlap=settings.chunk_overlap,
         chunk_strategy=settings.chunk_strategy,
+        chunk_target_tokens=settings.chunk_target_tokens,
+        chunk_min_tokens=settings.chunk_min_tokens,
+        chunk_safety_ratio=settings.chunk_safety_ratio,
+        chunk_semantic_threshold=settings.chunk_semantic_threshold,
+        chunk_semantic_enabled=settings.chunk_semantic_enabled,
     )
 
 

@@ -7,6 +7,13 @@ from dataclasses import dataclass
 class LLMMessage:
     role: str  # 'user' | 'assistant' | 'system'
     content: str
+    # Optional image data URLs (data:image/...;base64,...) for vision models.
+    # When None/empty, the message is rendered as plain text (backward compatible).
+    images: list[str] | None = None
+
+    @property
+    def has_images(self) -> bool:
+        return bool(self.images)
 
 
 @dataclass

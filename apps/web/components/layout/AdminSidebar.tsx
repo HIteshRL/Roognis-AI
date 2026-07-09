@@ -2,7 +2,6 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { UserButton } from '@clerk/nextjs'
 import {
   BookOpen,
   BrainCircuit,
@@ -15,6 +14,7 @@ import {
 import { cn } from '@/lib/utils'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { Separator } from '@/components/ui/separator'
+import { AccountButton } from '@/components/layout/AccountButton'
 
 const navItems = [
   { href: '/admin', icon: LayoutDashboard, label: 'Overview', exact: true },
@@ -61,8 +61,8 @@ export function AdminSidebar() {
         </nav>
       </ScrollArea>
       <Separator />
-      <div className="flex items-center gap-3 p-4">
-        <UserButton afterSignOutUrl="/login" />
+      <div className="flex flex-col gap-3 p-4">
+        <AccountButton />
         <Link href="/dashboard" className="text-xs text-muted-foreground hover:text-foreground">
           ← Back to app
         </Link>

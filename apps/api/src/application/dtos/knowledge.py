@@ -1,5 +1,4 @@
-from pydantic import UUID4, BaseModel, Field, model_validator
-
+from pydantic import BaseModel, Field
 
 # ── Knowledge Base ────────────────────────────────────────────────────────────
 
@@ -124,8 +123,15 @@ class RetrievedContext(BaseModel):
         for i, chunk in enumerate(self.chunks, start=1):
             source = chunk.document_title or chunk.document_id
             page = f", page {chunk.page_number}" if chunk.page_number else ""
+            scope = ""
+            subject = chunk.metadata.get("subject", "")
+            chapter = chunk.metadata.get("chapter", "")
+            if subject:
+                scope = f" | {subject}"
+                if chapter:
+                    scope += f" > {chapter}"
             parts.append(
-                f"[Source {i}: {source}{page}]\n{chunk.content}"
+                f"[Source {i}: {source}{page}{scope}]\n{chunk.content}"
             )
         return "\n\n---\n\n".join(parts)
 

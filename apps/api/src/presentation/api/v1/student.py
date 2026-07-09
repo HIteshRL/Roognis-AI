@@ -15,6 +15,11 @@ from src.application.dtos.learning import (
     StudentProfileResponse,
     UpdateProfileRequest,
 )
+from src.application.dtos.psychometric import (
+    PsychometricProfileResponse,
+    PsychometricQuestion,
+    SubmitResponseRequest,
+)
 from src.application.dtos.user import UserResponse
 from src.application.interfaces.dependencies import (
     get_concept_memory_service,
@@ -24,6 +29,7 @@ from src.application.interfaces.dependencies import (
     get_learning_path_service,
     get_mastery_engine,
     get_next_best_topic_engine,
+    get_psychometric_service,
     get_session_memory_service,
     get_skill_graph_service,
     get_student_profile_service,
@@ -34,6 +40,9 @@ from src.application.services.learning_gap_detector import LearningGapDetector
 from src.application.services.learning_path_service import LearningPathService
 from src.application.services.mastery_engine import MasteryEngine
 from src.application.services.next_best_topic_engine import NextBestTopicEngine
+from src.application.services.psychometric_assessment_service import (
+    PsychometricAssessmentService,
+)
 from src.application.services.session_memory_service import SessionMemoryService
 from src.application.services.skill_graph_service import SkillGraphService
 from src.application.services.student_profile_service import StudentProfileService
@@ -98,6 +107,65 @@ async def update_profile(
         current_chapter=body.current_chapter,
     )
     return ok(_profile_to_dict(profile), request_id=request.state.request_id)
+
+
+def _psychometric_to_dict(profile) -> dict:
+    return PsychometricProfileResponse(
+        motivation_type=profile.motivation_type,
+        motivation_strength=profile.motivation_strength,
+        discipline=profile.discipline,
+        interests=profile.interests,
+        learning_style_preference=profile.learning_style_preference,
+        confidence_self_report=profile.confidence_self_report,
+        sources=profile.sources,
+        completeness=profile.completeness,
+        assessed_at=profile.assessed_at,
+    ).model_dump(mode="json")
+
+
+@router.get("/psychometric/questions", response_model=None)
+async def get_psychometric_questions(
+    request: Request,
+    current_user: Annotated[UserResponse, Depends(get_current_user)],
+    psychometric_svc: Annotated[
+        PsychometricAssessmentService, Depends(get_psychometric_service)
+    ],
+    limit: int = Query(default=5, ge=1, le=20),
+):
+    questions = await psychometric_svc.get_pending_questions(
+        UUID(current_user.id), limit=limit
+    )
+    return ok(
+        [PsychometricQuestion(**q).model_dump(mode="json") for q in questions],
+        request_id=request.state.request_id,
+    )
+
+
+@router.post("/psychometric/responses", response_model=None)
+async def submit_psychometric_response(
+    body: SubmitResponseRequest,
+    request: Request,
+    current_user: Annotated[UserResponse, Depends(get_current_user)],
+    psychometric_svc: Annotated[
+        PsychometricAssessmentService, Depends(get_psychometric_service)
+    ],
+):
+    profile = await psychometric_svc.record_response(
+        UUID(current_user.id), body.question_key, body.value, raw=body.value
+    )
+    return ok(_psychometric_to_dict(profile), request_id=request.state.request_id)
+
+
+@router.get("/psychometric/profile", response_model=None)
+async def get_psychometric_profile(
+    request: Request,
+    current_user: Annotated[UserResponse, Depends(get_current_user)],
+    psychometric_svc: Annotated[
+        PsychometricAssessmentService, Depends(get_psychometric_service)
+    ],
+):
+    profile = await psychometric_svc.get_profile(UUID(current_user.id))
+    return ok(_psychometric_to_dict(profile), request_id=request.state.request_id)
 
 
 @router.get("/sessions", response_model=None)

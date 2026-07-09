@@ -32,6 +32,13 @@ class FastEmbedProvider(AbstractEmbeddingProvider):
     def dimension(self) -> int:
         return self._dim
 
+    @property
+    def max_tokens(self) -> int:
+        # BAAI/bge-small-en-v1.5 is BERT-based: 512 WordPiece tokens, hard
+        # truncation beyond it. Note this is the model's own tokenizer, not
+        # tiktoken — the chunker guards the gap with a safety ratio.
+        return 512
+
     async def embed(self, texts: list[str]) -> EmbeddingResult:
         vectors = list(self._model.embed(texts))
         return EmbeddingResult(

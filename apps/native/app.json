@@ -1,0 +1,38 @@
+{
+  "expo": {
+    "name": "Roognis",
+    "slug": "roognis",
+    "version": "0.1.0",
+    "orientation": "portrait",
+    "scheme": "roognis",
+    "userInterfaceStyle": "automatic",
+    "newArchEnabled": true,
+    "backgroundColor": "#0B1120",
+    "assetBundlePatterns": [
+      "**/*"
+    ],
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "ai.roognis.app"
+    },
+    "android": {
+      "package": "ai.roognis.app",
+      "permissions": [
+        "INTERNET"
+      ]
+    },
+    "web": {
+      "bundler": "metro",
+      "output": "single"
+    },
+    "plugins": [
+      "expo-router",
+      "expo-secure-store",
+      "expo-asset",
+      "expo-font"
+    ],
+    "experiments": {
+      "typedRoutes": true
+    }
+  }
+}

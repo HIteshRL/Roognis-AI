@@ -23,3 +23,10 @@ class AbstractEmbeddingProvider(ABC):
     @property
     @abstractmethod
     def dimension(self) -> int: ...
+
+    @property
+    def max_tokens(self) -> int:
+        """The model's hard input-token ceiling. Text beyond this is silently
+        truncated by the provider at embed time, so the chunker must budget
+        against it. Default is conservative; providers should override."""
+        return 512

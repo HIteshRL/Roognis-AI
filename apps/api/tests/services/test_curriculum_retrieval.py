@@ -4,21 +4,19 @@ Verifies that the CurriculumFilter.to_payload_filter() contract is correct,
 that RetrievalService passes the filter to the vector store, and that
 RagService assembles timing + structured responses correctly.
 """
+from unittest.mock import AsyncMock, MagicMock
+
 import pytest
-from unittest.mock import AsyncMock, MagicMock, patch
 
 from src.application.dtos.knowledge import (
     CurriculumFilter,
     RagQueryRequest,
     SearchResultItem,
 )
-from src.application.services.retrieval_service import RetrievalService
-from src.application.services.rag_service import RagService
 from src.application.services.context_validation_service import ContextValidationService
-from src.application.services.prompt_assembly_service import PromptAssemblyService
-from src.infrastructure.embeddings.base import EmbeddingResult
+from src.application.services.rag_service import RagService
+from src.application.services.retrieval_service import RetrievalService
 from src.infrastructure.vector.base import SearchResult
-
 
 # ── CurriculumFilter ──────────────────────────────────────────────────────────
 

@@ -26,6 +26,11 @@ class OpenAIEmbeddingProvider(AbstractEmbeddingProvider):
     def dimension(self) -> int:
         return self._dim
 
+    @property
+    def max_tokens(self) -> int:
+        # text-embedding-3-* accept up to 8191 tokens.
+        return 8191
+
     async def embed(self, texts: list[str]) -> EmbeddingResult:
         response = await self._client.embeddings.create(input=texts, model=self._model)
         vectors = [item.embedding for item in response.data]

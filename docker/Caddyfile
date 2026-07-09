@@ -1,0 +1,20 @@
+# Single-domain reverse proxy with automatic HTTPS (Let's Encrypt).
+# $DOMAIN comes from the environment (set in .env). Use a real domain or an
+# IP-based one like 203-0-113-5.sslip.io — both get a real cert automatically.
+
+{$DOMAIN} {
+	encode zstd gzip
+
+	# API, docs, health, metrics → FastAPI. Everything else → Next.js.
+	@api path /api/* /docs /redoc /openapi.json /metrics
+	handle @api {
+		reverse_proxy api:8000 {
+			# Stream Server-Sent Events (chat) through immediately, no buffering.
+			flush_interval -1
+		}
+	}
+
+	handle {
+		reverse_proxy web:3000
+	}
+}

@@ -6,6 +6,7 @@ import { Brain, BookOpen, AlertTriangle, TrendingUp, Zap, Target, Activity, Flam
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Progress } from '@/components/ui/progress'
+import { PsychometricSurveyCard } from './PsychometricSurveyCard'
 import Link from 'next/link'
 
 export function StudentDashboardView() {
@@ -91,6 +92,9 @@ export function StudentDashboardView() {
           </div>
         </CardContent>
       </Card>
+
+      {/* Psychometric onboarding survey / Motivation & Mindset (Phase A) */}
+      <PsychometricSurveyCard />
 
       {/* Learner Intelligence card */}
       {profile?.behavioral_signals && profile.behavioral_signals.total_sessions >= 3 && (

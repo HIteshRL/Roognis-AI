@@ -1,8 +1,13 @@
 import type { Metadata } from 'next'
-import { ChatView } from '@/features/chat/components/ChatView'
+import { ClassroomChatView } from '@/features/chat/components/ClassroomChatView'
 
 export const metadata: Metadata = { title: 'Chat' }
 
-export default function ConversationPage({ params }: { params: { id: string } }) {
-  return <ChatView conversationId={params.id} />
+export default async function ConversationPage({
+  params,
+}: {
+  params: Promise<{ id: string }>
+}) {
+  const { id } = await params
+  return <ClassroomChatView conversationId={id} />
 }

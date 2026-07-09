@@ -24,12 +24,24 @@ export function RegisterForm() {
   const {
     register,
     handleSubmit,
+    setValue,
+    watch,
     formState: { errors, isSubmitting },
-  } = useForm<RegisterFormValues>({ resolver: zodResolver(registerSchema) })
+  } = useForm<RegisterFormValues>({
+    resolver: zodResolver(registerSchema),
+    defaultValues: { role: 'student' },
+  })
+
+  const role = watch('role')
+  const roleOptions = [
+    { value: 'student', label: 'Student' },
+    { value: 'parent', label: 'Parent' },
+    { value: 'teacher', label: 'Teacher' },
+  ] as const
 
   const onSubmit = async (data: RegisterFormValues) => {
     try {
-      const res = await authApi.register(data.email, data.username, data.password)
+      const res = await authApi.register(data.email, data.username, data.password, data.role)
       setAuth(res.data.user, res.data.token)
       toast.success('Account created!')
       router.push('/dashboard')
@@ -47,6 +59,29 @@ export function RegisterForm() {
       </CardHeader>
       <form onSubmit={handleSubmit(onSubmit)}>
         <CardContent className="space-y-4">
+          <div className="space-y-1.5">
+            <Label>I am a…</Label>
+            <div className="grid grid-cols-3 gap-2" role="radiogroup" aria-label="Account type">
+              {roleOptions.map((opt) => (
+                <button
+                  key={opt.value}
+                  type="button"
+                  role="radio"
+                  aria-checked={role === opt.value}
+                  onClick={() => setValue('role', opt.value, { shouldValidate: true })}
+                  className={
+                    'rounded-md border px-3 py-2 text-sm font-medium transition-colors ' +
+                    (role === opt.value
+                      ? 'border-primary bg-primary/10 text-primary'
+                      : 'border-input text-muted-foreground hover:bg-accent/50')
+                  }
+                >
+                  {opt.label}
+                </button>
+              ))}
+            </div>
+          </div>
+
           <div className="space-y-1.5">
             <Label htmlFor="email">Email</Label>
             <Input id="email" type="email" placeholder="you@example.com" {...register('email')} />

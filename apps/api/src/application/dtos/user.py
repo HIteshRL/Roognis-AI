@@ -47,5 +47,6 @@ class UserResponse(BaseModel):
     is_active: bool
     is_verified: bool
     is_admin: bool = False
+    role: str = "student"
     created_at: str
     updated_at: str

@@ -45,6 +45,13 @@ class AbstractLearningSessionRepository(ABC):
     @abstractmethod
     async def list_since(self, user_id: UUID, since: datetime) -> list[LearningSession]: ...
 
+    @abstractmethod
+    async def session_stats_by_users(
+        self, user_ids: list[UUID]
+    ) -> dict[UUID, tuple[int, datetime | None]]:
+        """Per-user (session_count, last_activity) in one aggregate query."""
+        ...
+
 
 class AbstractConceptNodeRepository(ABC):
     @abstractmethod
@@ -93,6 +100,11 @@ class AbstractMasteryRepository(ABC):
     @abstractmethod
     async def average_score(self, user_id: UUID) -> float: ...
 
+    @abstractmethod
+    async def average_scores_by_users(self, user_ids: list[UUID]) -> dict[UUID, float]:
+        """Per-user average mastery score in one aggregate query."""
+        ...
+
 
 class AbstractLearningGapRepository(ABC):
     @abstractmethod
@@ -106,6 +118,19 @@ class AbstractLearningGapRepository(ABC):
 
     @abstractmethod
     async def resolve(self, gap_id: UUID) -> None: ...
+
+    @abstractmethod
+    async def active_gap_counts_by_users(self, user_ids: list[UUID]) -> dict[UUID, int]:
+        """Per-user count of unresolved gaps in one aggregate query."""
+        ...
+
+    @abstractmethod
+    async def top_concepts_by_users(
+        self, user_ids: list[UUID], limit: int = 5
+    ) -> list[tuple[str, int]]:
+        """Most common unresolved-gap concepts across the cohort, ranked by
+        number of distinct students affected."""
+        ...
 
 
 class AbstractConceptMemoryRepository(ABC):
