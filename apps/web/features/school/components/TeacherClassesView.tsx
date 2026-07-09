@@ -4,12 +4,35 @@ import { useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import Link from 'next/link'
 import { toast } from 'sonner'
-import { GraduationCap, Plus, School as SchoolIcon, Users, BookOpen, ArrowRight } from 'lucide-react'
+import {
+  ArrowRight,
+  BookOpen,
+  FileStack,
+  GraduationCap,
+  Plus,
+  School as SchoolIcon,
+  Users,
+} from 'lucide-react'
 import { schoolApi, type CreateClassroomPayload } from '@/lib/api/school'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
+
+// Deterministic banner colour from the class id — matches ClassroomDetailView.
+const BANNERS = [
+  'from-sky-500 to-indigo-600',
+  'from-emerald-500 to-teal-600',
+  'from-violet-500 to-purple-600',
+  'from-amber-500 to-orange-600',
+  'from-rose-500 to-pink-600',
+  'from-cyan-500 to-blue-600',
+]
+function bannerFor(id: string): string {
+  let h = 0
+  for (let i = 0; i < id.length; i++) h = (h * 31 + id.charCodeAt(i)) >>> 0
+  return BANNERS[h % BANNERS.length]
+}
 
 export function TeacherClassesView() {
   const qc = useQueryClient()
@@ -160,28 +183,33 @@ export function TeacherClassesView() {
             </CardContent>
           </Card>
         ) : (
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
             {classrooms.map((c) => (
               <Link key={c.id} href={`/teacher/classes/${c.id}`}>
-                <Card className="h-full transition-colors hover:border-primary/50">
-                  <CardContent className="flex h-full flex-col gap-3 p-4">
-                    <div className="flex items-start justify-between">
-                      <div>
-                        <h3 className="font-semibold">{c.name}</h3>
-                        <p className="text-xs text-muted-foreground">
-                          {c.subject ?? 'General'} {c.grade ? `· Grade ${c.grade}` : ''}
-                        </p>
-                      </div>
-                      <Badge variant="secondary" className="font-mono">
-                        {c.join_code}
-                      </Badge>
-                    </div>
+                <Card className="h-full overflow-hidden transition-shadow hover:shadow-md">
+                  {/* Google Classroom–style colour banner */}
+                  <div
+                    className={`relative bg-gradient-to-br ${bannerFor(c.id)} p-4 pb-8 text-white`}
+                  >
+                    <div className="absolute -right-4 -top-4 h-20 w-20 rounded-full bg-white/10" />
+                    <h3 className="relative truncate text-lg font-semibold">{c.name}</h3>
+                    <p className="relative truncate text-xs text-white/85">
+                      {c.subject ?? 'General'} {c.grade ? `· Grade ${c.grade}` : ''}
+                    </p>
+                  </div>
+                  <CardContent className="flex flex-col gap-3 p-4">
+                    <Badge variant="secondary" className="w-fit font-mono">
+                      {c.join_code}
+                    </Badge>
                     <div className="mt-auto flex items-center gap-4 text-xs text-muted-foreground">
-                      <span className="flex items-center gap-1">
+                      <span className="flex items-center gap-1" title="Students">
                         <Users className="h-3.5 w-3.5" /> {c.student_count}
                       </span>
-                      <span className="flex items-center gap-1">
+                      <span className="flex items-center gap-1" title="Chapters">
                         <BookOpen className="h-3.5 w-3.5" /> {c.syllabus_count}
+                      </span>
+                      <span className="flex items-center gap-1" title="Materials">
+                        <FileStack className="h-3.5 w-3.5" /> {c.material_count}
                       </span>
                       <ArrowRight className="ml-auto h-4 w-4" />
                     </div>

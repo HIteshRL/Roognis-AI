@@ -229,7 +229,15 @@ class RetrievalService:
                 f["knowledge_base_id"] = knowledge_base_id
             levels.append(("grade", f))
 
-        levels.append(("unscoped", None))
+        # Broadest fallback. When a knowledge base is in scope (a student's
+        # class KB), stay bounded to it — never leak into other classrooms'
+        # material. Only the global RAG path (no KB) falls through to unscoped.
+        if knowledge_base_id:
+            kb_only = {"knowledge_base_id": knowledge_base_id}
+            if not levels or levels[-1][1] != kb_only:
+                levels.append(("kb", kb_only))
+        else:
+            levels.append(("unscoped", None))
         return levels
 
     @staticmethod

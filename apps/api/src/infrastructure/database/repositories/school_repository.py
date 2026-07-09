@@ -68,6 +68,7 @@ def _to_classroom(m: ClassroomModel) -> Classroom:
     c.join_code = m.join_code
     c.description = m.description
     c.is_active = m.is_active
+    c.knowledge_base_id = _uid(m.knowledge_base_id)
     c.created_at = m.created_at
     c.updated_at = m.updated_at
     return c
@@ -197,6 +198,9 @@ class ClassroomRepository(AbstractClassroomRepository):
             join_code=classroom.join_code,
             description=classroom.description,
             is_active=classroom.is_active,
+            knowledge_base_id=(
+                str(classroom.knowledge_base_id) if classroom.knowledge_base_id else None
+            ),
         )
         self._db.add(m)
         await self._db.flush()
@@ -253,6 +257,9 @@ class ClassroomRepository(AbstractClassroomRepository):
         m.teacher_id = str(classroom.teacher_id) if classroom.teacher_id else None
         m.description = classroom.description
         m.is_active = classroom.is_active
+        m.knowledge_base_id = (
+            str(classroom.knowledge_base_id) if classroom.knowledge_base_id else None
+        )
         await self._db.flush()
         await self._db.refresh(m)
         return _to_classroom(m)

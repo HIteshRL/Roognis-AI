@@ -50,6 +50,10 @@ class ClassroomModel(Base, UUIDMixin, TimestampMixin):
     join_code: Mapped[str] = mapped_column(String(16), unique=True, nullable=False, index=True)
     description: Mapped[str | None] = mapped_column(Text, nullable=True)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+    knowledge_base_id: Mapped[str | None] = mapped_column(
+        UUID(as_uuid=False), ForeignKey("knowledge_bases.id", ondelete="SET NULL"),
+        nullable=True,
+    )
 
 
 class EnrollmentModel(Base, UUIDMixin, TimestampMixin):

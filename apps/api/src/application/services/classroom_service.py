@@ -151,6 +151,23 @@ class ClassroomService:
         if not enrollment or enrollment.status != "active":
             raise AuthorizationError("You are not enrolled in this classroom")
 
+    async def resolve_kb_for_student(
+        self, student_id: UUID, subject: str | None = None
+    ) -> UUID | None:
+        """The knowledge base of the student's enrolled class for this subject
+        (or their first class with materials), so the tutor grounds answers in
+        the teacher's uploads. Returns None when the student has no such class."""
+        classrooms = await self.list_enrolled(student_id)
+        with_kb = [c for c in classrooms if c.knowledge_base_id]
+        if not with_kb:
+            return None
+        if subject:
+            target = subject.strip().lower()
+            for c in with_kb:
+                if (c.subject or "").strip().lower() == target:
+                    return c.knowledge_base_id
+        return with_kb[0].knowledge_base_id
+
     # ── Counts (for response DTOs) ───────────────────────────────────────────
 
     async def counts(self, classroom_id: UUID) -> tuple[int, int]:

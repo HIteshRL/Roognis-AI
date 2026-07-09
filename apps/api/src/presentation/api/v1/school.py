@@ -1,7 +1,7 @@
 from typing import Annotated
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, Request
+from fastapi import APIRouter, BackgroundTasks, Depends, File, Request, UploadFile
 
 from src.application.dtos.school import (
     AddTeacherRequest,
@@ -10,6 +10,8 @@ from src.application.dtos.school import (
     CreateSchoolRequest,
     CreateSyllabusItemRequest,
     JoinClassroomRequest,
+    MaterialResponse,
+    MaterialUploadResponse,
     RosterEntryResponse,
     SchoolMemberResponse,
     SchoolResponse,
@@ -20,19 +22,59 @@ from src.application.dtos.school import (
 from src.application.dtos.user import UserResponse
 from src.application.interfaces.dependencies import (
     get_classroom_analytics_service,
+    get_classroom_materials_service,
     get_classroom_service,
     get_current_user,
     get_school_service,
+    get_settings,
     get_syllabus_service,
     require_teacher,
 )
 from src.application.services.classroom_analytics_service import ClassroomAnalyticsService
+from src.application.services.classroom_materials_service import ClassroomMaterialsService
 from src.application.services.classroom_service import ClassroomService
+from src.application.services.ingestion_pipeline import IngestionPipeline
 from src.application.services.school_service import SchoolService
 from src.application.services.syllabus_service import SyllabusService
+from src.config import Settings
+from src.domain.entities.knowledge import Document
+from src.infrastructure.embeddings.factory import get_embedding_provider
+from src.infrastructure.vector.factory import get_vector_store
 from src.presentation.api.response import ok
 
 router = APIRouter(prefix="/school", tags=["School & Classrooms"])
+
+
+def _make_ingestion_pipeline(settings: Settings) -> IngestionPipeline:
+    return IngestionPipeline(
+        vector_store=get_vector_store(),
+        embedding_provider=get_embedding_provider(),
+        chunk_size=settings.chunk_size,
+        chunk_overlap=settings.chunk_overlap,
+        chunk_strategy=settings.chunk_strategy,
+        chunk_target_tokens=settings.chunk_target_tokens,
+        chunk_min_tokens=settings.chunk_min_tokens,
+        chunk_safety_ratio=settings.chunk_safety_ratio,
+        chunk_semantic_threshold=settings.chunk_semantic_threshold,
+        chunk_semantic_enabled=settings.chunk_semantic_enabled,
+    )
+
+
+def _material(classroom_id: UUID, doc: Document) -> dict:
+    return MaterialResponse(
+        id=str(doc.id),
+        classroom_id=str(classroom_id),
+        filename=doc.filename,
+        title=doc.title,
+        chapter=(doc.metadata or {}).get("chapter") or doc.description,
+        file_type=doc.file_type,
+        file_size=doc.file_size,
+        status=doc.status,
+        chunk_count=doc.chunk_count,
+        error_message=doc.error_message,
+        created_at=doc.created_at.isoformat(),
+        updated_at=doc.updated_at.isoformat(),
+    ).model_dump(mode="json")
 
 
 # ── Serializers ──────────────────────────────────────────────────────────────
@@ -51,7 +93,9 @@ def _school(s, my_role: str) -> dict:
     ).model_dump(mode="json")
 
 
-def _classroom(c, student_count: int = 0, syllabus_count: int = 0) -> dict:
+def _classroom(
+    c, student_count: int = 0, syllabus_count: int = 0, material_count: int = 0
+) -> dict:
     return ClassroomResponse(
         id=str(c.id),
         school_id=str(c.school_id),
@@ -62,6 +106,8 @@ def _classroom(c, student_count: int = 0, syllabus_count: int = 0) -> dict:
         join_code=c.join_code,
         description=c.description,
         is_active=c.is_active,
+        knowledge_base_id=str(c.knowledge_base_id) if c.knowledge_base_id else None,
+        material_count=material_count,
         student_count=student_count,
         syllabus_count=syllabus_count,
         created_at=c.created_at.isoformat(),
@@ -185,12 +231,14 @@ async def my_classrooms(
     request: Request,
     current_user: Annotated[UserResponse, Depends(require_teacher)],
     svc: Annotated[ClassroomService, Depends(get_classroom_service)],
+    materials: Annotated[ClassroomMaterialsService, Depends(get_classroom_materials_service)],
 ):
     classrooms = await svc.list_my_classrooms(UUID(current_user.id))
     data = []
     for c in classrooms:
         students, syllabus = await svc.counts(c.id)
-        data.append(_classroom(c, students, syllabus))
+        material_count = await materials.count_materials(c)
+        data.append(_classroom(c, students, syllabus, material_count))
     return ok(data, request_id=request.state.request_id)
 
 
@@ -200,10 +248,15 @@ async def get_classroom(
     request: Request,
     current_user: Annotated[UserResponse, Depends(require_teacher)],
     svc: Annotated[ClassroomService, Depends(get_classroom_service)],
+    materials: Annotated[ClassroomMaterialsService, Depends(get_classroom_materials_service)],
 ):
     classroom = await svc.get_for_manage(UUID(classroom_id), UUID(current_user.id))
     students, syllabus = await svc.counts(classroom.id)
-    return ok(_classroom(classroom, students, syllabus), request_id=request.state.request_id)
+    material_count = await materials.count_materials(classroom)
+    return ok(
+        _classroom(classroom, students, syllabus, material_count),
+        request_id=request.state.request_id,
+    )
 
 
 @router.patch("/classrooms/{classroom_id}", response_model=None)
@@ -268,6 +321,74 @@ async def classroom_analytics(
 ):
     data = await svc.classroom_analytics(UUID(classroom_id), UUID(current_user.id))
     return ok(data.model_dump(mode="json"), request_id=request.state.request_id)
+
+
+# ── Materials (teacher uploads → student RAG grounding) ──────────────────────
+
+
+@router.post("/classrooms/{classroom_id}/materials", response_model=None)
+async def upload_material(
+    classroom_id: str,
+    request: Request,
+    background_tasks: BackgroundTasks,
+    current_user: Annotated[UserResponse, Depends(require_teacher)],
+    svc: Annotated[ClassroomMaterialsService, Depends(get_classroom_materials_service)],
+    settings: Annotated[Settings, Depends(get_settings)],
+    file: UploadFile = File(...),
+    chapter: str | None = None,
+):
+    file_bytes = await file.read()
+    doc, job = await svc.upload_material(
+        classroom_id=UUID(classroom_id),
+        teacher_id=UUID(current_user.id),
+        filename=file.filename or "upload",
+        file_bytes=file_bytes,
+        content_type=file.content_type or "",
+        chapter=chapter,
+    )
+
+    pipeline = _make_ingestion_pipeline(settings)
+    background_tasks.add_task(pipeline.run, doc.id, doc.storage_path, doc.file_type)
+
+    return ok(
+        MaterialUploadResponse(
+            id=str(doc.id),
+            classroom_id=classroom_id,
+            filename=doc.filename,
+            status=doc.status,
+            job_id=str(job.id),
+            created_at=doc.created_at.isoformat(),
+        ).model_dump(mode="json"),
+        message="Material uploaded. Processing started.",
+        request_id=request.state.request_id,
+        status_code=201,
+    )
+
+
+@router.get("/classrooms/{classroom_id}/materials", response_model=None)
+async def list_materials(
+    classroom_id: str,
+    request: Request,
+    current_user: Annotated[UserResponse, Depends(require_teacher)],
+    svc: Annotated[ClassroomMaterialsService, Depends(get_classroom_materials_service)],
+):
+    docs = await svc.list_materials(UUID(classroom_id), UUID(current_user.id))
+    data = [_material(UUID(classroom_id), d) for d in docs]
+    return ok(data, request_id=request.state.request_id)
+
+
+@router.delete("/classrooms/{classroom_id}/materials/{document_id}", response_model=None)
+async def delete_material(
+    classroom_id: str,
+    document_id: str,
+    request: Request,
+    current_user: Annotated[UserResponse, Depends(require_teacher)],
+    svc: Annotated[ClassroomMaterialsService, Depends(get_classroom_materials_service)],
+):
+    await svc.delete_material(
+        UUID(classroom_id), UUID(current_user.id), UUID(document_id)
+    )
+    return ok({}, message="Material deleted", request_id=request.state.request_id)
 
 
 # ── Syllabus (teacher writes, student reads published) ───────────────────────

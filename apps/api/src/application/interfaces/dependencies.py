@@ -16,6 +16,7 @@ from src.application.services.auth_service import AuthService
 from src.application.services.caching_engine import CachingEngine
 from src.application.services.chat_service import ChatService
 from src.application.services.classroom_analytics_service import ClassroomAnalyticsService
+from src.application.services.classroom_materials_service import ClassroomMaterialsService
 from src.application.services.classroom_service import ClassroomService
 from src.application.services.concept_extraction_service import ConceptExtractionService
 from src.application.services.concept_memory_service import ConceptMemoryService
@@ -266,6 +267,19 @@ def get_chat_service(
             image_size=settings.image_gen_size,
         )
 
+    # Grounds the tutor in the student's classroom material (teacher uploads).
+    # Only wired when retrieval is on — no KB scoping without RAG.
+    classroom_kb_resolver = None
+    if settings.retrieval_enabled:
+        classroom_kb_resolver = ClassroomService(
+            classroom_repo=ClassroomRepository(db),
+            enrollment_repo=EnrollmentRepository(db),
+            member_repo=SchoolMemberRepository(db),
+            syllabus_repo=SyllabusRepository(db),
+            user_repo=UserRepository(db),
+            join_code_length=settings.classroom_join_code_length,
+        )
+
     return ChatService(
         conversation_repo=ConversationRepository(db),
         message_repo=MessageRepository(db),
@@ -283,6 +297,7 @@ def get_chat_service(
         vision_enabled=settings.vision_enabled,
         response_image_svc=response_image_svc,
         response_image_enabled=settings.response_image_enabled,
+        classroom_kb_resolver=classroom_kb_resolver,
     )
 
 
@@ -607,6 +622,19 @@ def get_classroom_service(
         syllabus_repo=SyllabusRepository(db),
         user_repo=UserRepository(db),
         join_code_length=settings.classroom_join_code_length,
+    )
+
+
+def get_classroom_materials_service(
+    db: Annotated[AsyncSession, Depends(get_db)],
+    classroom_service: Annotated[ClassroomService, Depends(get_classroom_service)],
+    document_svc: Annotated[DocumentService, Depends(get_document_service)],
+) -> ClassroomMaterialsService:
+    return ClassroomMaterialsService(
+        classroom_service=classroom_service,
+        classroom_repo=ClassroomRepository(db),
+        kb_repo=KnowledgeBaseRepository(db),
+        document_svc=document_svc,
     )
 
 

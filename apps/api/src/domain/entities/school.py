@@ -51,6 +51,7 @@ class Classroom:
     join_code: str = ""
     description: str | None = None
     is_active: bool = True
+    knowledge_base_id: UUID | None = None
     created_at: datetime = field(default_factory=lambda: datetime.now(UTC))
     updated_at: datetime = field(default_factory=lambda: datetime.now(UTC))
 

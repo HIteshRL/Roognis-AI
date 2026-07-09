@@ -50,6 +50,7 @@ class ChatService:
         vision_enabled: bool = False,
         response_image_svc=None,
         response_image_enabled: bool = False,
+        classroom_kb_resolver=None,
     ) -> None:
         self._conversations = conversation_repo
         self._messages = message_repo
@@ -67,6 +68,11 @@ class ChatService:
         self._vision_enabled = vision_enabled
         self._response_image_svc = response_image_svc
         self._response_image_enabled = response_image_enabled
+        # Resolves an enrolled student's classroom knowledge base so the tutor
+        # can ground answers in the teacher's uploaded material. Typed loosely
+        # (ClassroomService) to avoid a service→service import cycle; wired at
+        # runtime in dependencies.py. Fail-open — None means global RAG only.
+        self._classroom_kb_resolver = classroom_kb_resolver
 
     async def stream_response(
         self,
@@ -147,12 +153,14 @@ class ChatService:
         # ── CAG: context-aware retrieval with curriculum scoping ────────────
         if self._retrieval_enabled and self._retrieval and self._prompt_assembly:
             grade = await self._get_student_grade(user_id)
+            kb_id = await self._resolve_classroom_kb(user_id, conversation.subject)
 
             raw_context, retrieve_timing = await self._retrieval.retrieve_contextual(
                 query=dto.message,
                 subject=conversation.subject,
                 chapter=conversation.chapter,
                 grade=grade,
+                knowledge_base_id=kb_id,
             )
             cascade_level = retrieve_timing.get("cascade_level", "unscoped")
 
@@ -390,6 +398,24 @@ class ChatService:
             profile = await self._profile_repo.get_by_user_id(user_id)
             return profile.grade if profile else None
         except Exception:
+            return None
+
+    async def _resolve_classroom_kb(
+        self, user_id: UUID, subject: str | None
+    ) -> str | None:
+        """The student's enrolled-classroom KB, so answers ground in the
+        teacher's uploaded material. Fail-open: any error → global RAG."""
+        if self._classroom_kb_resolver is None:
+            return None
+        try:
+            kb = await self._classroom_kb_resolver.resolve_kb_for_student(
+                user_id, subject
+            )
+            return str(kb) if kb else None
+        except Exception as exc:
+            logger.warning(
+                "classroom_kb_resolve_failed", error=str(exc), user_id=str(user_id)
+            )
             return None
 
     @staticmethod

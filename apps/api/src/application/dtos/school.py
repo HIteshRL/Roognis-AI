@@ -62,6 +62,8 @@ class ClassroomResponse(BaseModel):
     join_code: str
     description: str | None
     is_active: bool
+    knowledge_base_id: str | None = None
+    material_count: int = 0
     student_count: int = 0
     syllabus_count: int = 0
     created_at: str
@@ -116,6 +118,33 @@ class SyllabusItemResponse(BaseModel):
     is_published: bool
     created_at: str
     updated_at: str
+
+
+# ── Classroom Materials (teacher uploads → student RAG) ──────────────────────
+
+
+class MaterialResponse(BaseModel):
+    id: str                     # document id
+    classroom_id: str
+    filename: str
+    title: str | None
+    chapter: str | None
+    file_type: str
+    file_size: int
+    status: str                 # pending | processing | ready | failed
+    chunk_count: int
+    error_message: str | None
+    created_at: str
+    updated_at: str
+
+
+class MaterialUploadResponse(BaseModel):
+    id: str
+    classroom_id: str
+    filename: str
+    status: str
+    job_id: str
+    created_at: str
 
 
 # ── Classroom Analytics (Teacher Dashboard) ──────────────────────────────────

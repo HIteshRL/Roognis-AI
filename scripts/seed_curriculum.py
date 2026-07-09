@@ -30,6 +30,7 @@ from src.infrastructure.database.repositories.knowledge_repository import (
     IngestionJobRepository,
     KnowledgeBaseRepository,
 )
+from src.infrastructure.database.repositories.school_repository import ClassroomRepository
 from src.infrastructure.database.repositories.user_repository import UserRepository
 from src.infrastructure.embeddings.factory import get_embedding_provider
 from src.infrastructure.vector.factory import get_vector_store
@@ -135,6 +136,21 @@ async def main() -> None:
                 grade="8",
             )
         )
+
+        # Wire the KB to the demo classroom so enrolled students' tutor grounds
+        # in it via the teacher content bridge (resolve_kb_for_student). Without
+        # this the demo still works through global subject/chapter retrieval,
+        # but linking it demonstrates the exact teacher→student path.
+        classroom_repo = ClassroomRepository(db)
+        teacher_classes = await classroom_repo.list_by_teacher(owner.id)
+        demo_class = next(
+            (c for c in teacher_classes if (c.subject or "").lower() == "mathematics"),
+            teacher_classes[0] if teacher_classes else None,
+        )
+        if demo_class and not demo_class.knowledge_base_id:
+            demo_class.knowledge_base_id = kb.id
+            await classroom_repo.update(demo_class)
+            print(f"Linked demo classroom '{demo_class.name}' to curriculum KB.")
 
         storage_dir = Path(settings.storage_local_path) / "curriculum"
         storage_dir.mkdir(parents=True, exist_ok=True)

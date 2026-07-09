@@ -30,10 +30,36 @@ export interface Classroom {
   join_code: string
   description: string | null
   is_active: boolean
+  knowledge_base_id: string | null
+  material_count: number
   student_count: number
   syllabus_count: number
   created_at: string
   updated_at: string
+}
+
+export interface Material {
+  id: string
+  classroom_id: string
+  filename: string
+  title: string | null
+  chapter: string | null
+  file_type: string
+  file_size: number
+  status: 'pending' | 'processing' | 'ready' | 'failed'
+  chunk_count: number
+  error_message: string | null
+  created_at: string
+  updated_at: string
+}
+
+export interface MaterialUpload {
+  id: string
+  classroom_id: string
+  filename: string
+  status: string
+  job_id: string
+  created_at: string
 }
 
 export interface RosterEntry {
@@ -144,6 +170,25 @@ export const schoolApi = {
 
   getClassroomAnalytics: (id: string) =>
     apiClient.get<ClassroomAnalytics>(`/api/v1/school/classrooms/${id}/analytics`),
+
+  // ── Materials (teacher uploads → student RAG) ──────────────────────────
+  getMaterials: (classroomId: string) =>
+    apiClient.get<Material[]>(`/api/v1/school/classrooms/${classroomId}/materials`),
+
+  uploadMaterial: (classroomId: string, file: File, chapter?: string) => {
+    const form = new FormData()
+    form.append('file', file)
+    const qs = chapter ? `?chapter=${encodeURIComponent(chapter)}` : ''
+    return apiClient.upload<MaterialUpload>(
+      `/api/v1/school/classrooms/${classroomId}/materials${qs}`,
+      form
+    )
+  },
+
+  deleteMaterial: (classroomId: string, documentId: string) =>
+    apiClient.delete<Record<string, never>>(
+      `/api/v1/school/classrooms/${classroomId}/materials/${documentId}`
+    ),
 
   // ── Syllabus ───────────────────────────────────────────────────────────
   getSyllabus: (classroomId: string) =>
