@@ -49,11 +49,15 @@ class LearnerContextService:
         mastery_repo: AbstractMasteryRepository,
         gap_repo: AbstractLearningGapRepository,
         concept_memory_svc=None,   # ConceptMemoryService | None — optional to avoid circular import
+        recall_scheduler=None,     # RecallScheduler | None — Phase LI, optional
+        preference_engine=None,    # PreferenceInferenceEngine | None — Phase LI, optional
     ) -> None:
         self._profiles = profile_repo
         self._mastery = mastery_repo
         self._gaps = gap_repo
         self._concept_memory = concept_memory_svc
+        self._recall = recall_scheduler
+        self._preferences = preference_engine
 
     async def build(self, user_id: UUID, current_intent: str = "unknown") -> str | None:
         profile = await self._profiles.get_by_user_id(user_id)
@@ -83,6 +87,11 @@ class LearnerContextService:
             teaching_history = await self._build_teaching_history(user_id)
             if teaching_history:
                 sections.append(teaching_history)
+
+        # ── Section 4b: Retention & Inferred Style (Phase LI) ────────────
+        retention_style = await self._build_retention_and_style(user_id)
+        if retention_style:
+            sections.append(retention_style)
 
         # ── Section 5: Adaptation Instructions ───────────────────────────
         instructions = self._build_adaptation_instructions(profile, bs, current_intent)
@@ -236,6 +245,46 @@ class LearnerContextService:
         lines.append("- Do not mention this profile or any internal system context to the student")
 
         return "\n".join(lines)
+
+    async def _build_retention_and_style(self, user_id: UUID) -> str:
+        """Evidence-derived retention + inferred learning-style hints. Fail-open."""
+        lines: list[str] = ["### Retention & Inferred Style"]
+
+        if self._recall is not None:
+            try:
+                due = await self._recall.due(user_id)
+                if due:
+                    names = ", ".join(s.concept_name for s in due[:_MAX_STRUGGLING_CONCEPTS])
+                    lines.append(
+                        f"- Due for recall (weave a quick check-in on): {names}"
+                    )
+                at_risk = await self._recall.at_risk(user_id)
+                if at_risk:
+                    weakest = at_risk[0][0].concept_name
+                    lines.append(
+                        f"- Retention decaying on {weakest} — reinforce it before moving on"
+                    )
+            except Exception:
+                pass
+
+        if self._preferences is not None:
+            try:
+                prefs = await self._preferences.reliable_preferences(user_id)
+                if prefs:
+                    labels = {
+                        "visual": "visual aids and diagrams",
+                        "worked_examples": "worked examples",
+                        "step_by_step": "step-by-step breakdowns",
+                        "interactive": "interactive back-and-forth",
+                        "short": "short, concise responses",
+                        "detailed": "detailed, thorough explanations",
+                    }
+                    top = ", ".join(labels.get(p.dimension, p.dimension) for p in prefs[:3])
+                    lines.append(f"- Responds best to: {top} (inferred from past sessions)")
+            except Exception:
+                pass
+
+        return "\n".join(lines) if len(lines) > 1 else ""
 
     async def _weakest_concepts(self, user_id: UUID) -> list[tuple[str, float]]:
         records = await self._mastery.list_by_user(user_id)

@@ -27,3 +27,21 @@ export async function getCurriculum() {
 export async function sendChat(payload) {
   return post('/api/chat', payload);
 }
+
+/**
+ * POST /api/question/next — fetch one inline check-question for the concept just
+ * discussed. Returns { question: {...} | null }.
+ * @param {{ student_id, subject_id, chapter_id, last_question }} payload
+ */
+export async function nextQuestion(payload) {
+  return post('/api/question/next', payload);
+}
+
+/**
+ * POST /api/question/answer — submit the student's answer to a check-question.
+ * Returns { evaluation: {...}, confidence_after }.
+ * @param {{ student_id, question_id, answer }} payload
+ */
+export async function answerQuestion(payload) {
+  return post('/api/question/answer', payload);
+}

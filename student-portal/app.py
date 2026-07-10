@@ -3,14 +3,23 @@ from pathlib import Path
 
 from fastapi import BackgroundTasks, FastAPI, File, HTTPException, UploadFile
 from fastapi.responses import FileResponse
+from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
+import bridge
 import engine
 import ingest
+import question_engine
 import store
 
 app = FastAPI(title="Roognis MVP", docs_url="/api/docs")
 _STATIC = Path(__file__).resolve().parent / "static"
+
+# Serve the modular student portal (portals/student-portal-ui) — the build that
+# carries the inline check-question UX. Its index.html links css/* and js/*.
+_PORTAL = Path(__file__).resolve().parent.parent / "portals" / "student-portal-ui"
+app.mount("/css", StaticFiles(directory=_PORTAL / "css"), name="portal-css")
+app.mount("/js", StaticFiles(directory=_PORTAL / "js"), name="portal-js")
 
 _SUBJECT_ICONS = {s["name"]: s["icon"] for s in __import__("curriculum").SUBJECTS}
 
@@ -65,6 +74,100 @@ async def chat_api(body: ChatIn):
                 "mode": engine.MODE, "conversation_id": None}
     return await engine.ask(body.question, body.subject_id, body.chapter_id,
                             body.student_id, body.conversation_id)
+
+
+# ── Learner Intelligence: inline questioning ──────────────────────────────────
+class QNextIn(BaseModel):
+    student_id: str
+    subject_id: str            # classroom id
+    chapter_id: str
+    last_question: str | None = None   # lets us target the concept the student engaged with
+
+
+@app.post("/api/question/next")
+async def question_next(body: QNextIn):
+    """Return one targeted check-question for the concept just discussed (or None).
+
+    Never random — the objective is to reduce uncertainty about THIS learner on
+    THIS concept. Reuses an outstanding question instead of stacking new ones.
+    """
+    if store.enrollment_status(body.subject_id, body.student_id) != "approved":
+        return {"question": None}
+
+    pending = store.next_pending_question(body.student_id)
+    if pending:
+        return {"question": _question_payload(pending)}
+
+    chapter = store.get_chapter(body.chapter_id)
+    if not chapter:
+        return {"question": None}
+    # The chapter is the concept scope for this demo; the summary supplies the
+    # keywords the answer is graded against.
+    concept = chapter["title"]
+
+    q = question_engine.generate(
+        concept=concept,
+        objective="verify_confidence",
+        # The demo doesn't model per-concept mastery, so use a neutral score to
+        # keep the check at "Understand" level ("Explain in your own words …")
+        # rather than down-ranking to a terse "State …" recall prompt.
+        mastery_score=50.0,
+        expected_answer=chapter.get("summary") or concept,
+    )
+    q.update(student_id=body.student_id, classroom_id=body.subject_id, chapter_id=body.chapter_id)
+    saved = store.create_question(q)
+    return {"question": _question_payload(saved)}
+
+
+class QAnswerIn(BaseModel):
+    student_id: str
+    question_id: str
+    answer: str = Field(min_length=1, max_length=5000)
+
+
+@app.post("/api/question/answer")
+async def question_answer(body: QAnswerIn, background: BackgroundTasks):
+    q = store.get_question(body.question_id)
+    if not q or q["student_id"] != body.student_id:
+        raise HTTPException(404, "Question not found")
+    if q["status"] == "evaluated":
+        raise HTTPException(409, "Question already answered")
+
+    ev = question_engine.evaluate(
+        expected_answer=q["expected_answer"], concept=q["concept"],
+        confidence_threshold=q["confidence_threshold"], answer=body.answer,
+    )
+    store.record_answer(body.question_id, body.answer, ev["is_correct"], ev["score"], ev["feedback"])
+    store.add_evidence({
+        "student_id": body.student_id, "concept": q["concept"], "signal": ev["signal"],
+        "objective": q["objective"], "source": "question", "weight": q["evidence_weight"],
+        "bloom_level": q["bloom_level"], "question_id": body.question_id,
+        "detail": ev["feedback"],
+    })
+    confidence = question_engine.concept_confidence(
+        store.concept_evidence(body.student_id, q["concept"])
+    )
+
+    # Phase 2 bridge: forward this evidence to apps/api's real engine (no-op unless
+    # configured). Runs after the response so it never adds latency to the student.
+    background.add_task(bridge.forward_evidence, {
+        "external_ref": body.student_id, "concept_name": q["concept"], "signal": ev["signal"],
+        "objective": q["objective"], "source": "question", "weight": q["evidence_weight"],
+        "bloom_level": q["bloom_level"], "intent": "problem_solving", "detail": ev["feedback"],
+    })
+
+    return {
+        "question_id": body.question_id, "concept": q["concept"],
+        "evaluation": ev, "confidence_after": confidence,
+    }
+
+
+def _question_payload(q: dict) -> dict:
+    return {
+        "id": q["id"], "concept": q["concept"], "question": q["question"],
+        "purpose": q["purpose"], "objective": q["objective"], "difficulty": q["difficulty"],
+        "bloom_level": q["bloom_level"], "confidence_threshold": q["confidence_threshold"],
+    }
 
 
 class JoinIn(BaseModel):
@@ -180,7 +283,7 @@ async def classroom_conversations(cid: str):
 # ── Static SPAs ───────────────────────────────────────────────────────────────
 @app.get("/")
 async def student_spa():
-    return FileResponse(_STATIC / "index.html")
+    return FileResponse(_PORTAL / "index.html")
 
 
 @app.get("/teacher")

@@ -54,6 +54,27 @@ CREATE TABLE IF NOT EXISTS messages (
   FOREIGN KEY(conversation_id) REFERENCES conversations(id) ON DELETE CASCADE
 );
 CREATE INDEX IF NOT EXISTS ix_msg_conv ON messages(conversation_id);
+
+-- Learner Intelligence (inline questioning). Mirrors apps/api's QuestionOutput
+-- contract so evidence can be bridged to the real engine 1:1.
+CREATE TABLE IF NOT EXISTS learner_questions (
+  id TEXT PRIMARY KEY, student_id TEXT NOT NULL, classroom_id TEXT, chapter_id TEXT,
+  concept TEXT NOT NULL, question TEXT NOT NULL, objective TEXT, purpose TEXT,
+  difficulty TEXT, bloom_level TEXT, expected_answer TEXT,
+  confidence_threshold REAL DEFAULT 0.6, evidence_weight REAL DEFAULT 1.0,
+  status TEXT DEFAULT 'asked', student_answer TEXT, is_correct INTEGER,
+  score REAL DEFAULT 0, feedback TEXT, created_at REAL, answered_at REAL
+);
+CREATE INDEX IF NOT EXISTS ix_lq_student ON learner_questions(student_id);
+CREATE INDEX IF NOT EXISTS ix_lq_status ON learner_questions(student_id, status);
+
+CREATE TABLE IF NOT EXISTS learner_evidence (
+  id TEXT PRIMARY KEY, student_id TEXT NOT NULL, concept TEXT, signal TEXT NOT NULL,
+  objective TEXT, source TEXT DEFAULT 'question', weight REAL DEFAULT 1.0,
+  bloom_level TEXT, intent TEXT, question_id TEXT, detail TEXT, created_at REAL
+);
+CREATE INDEX IF NOT EXISTS ix_le_student ON learner_evidence(student_id);
+CREATE INDEX IF NOT EXISTS ix_le_concept ON learner_evidence(student_id, concept);
 """
 
 _ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"

@@ -37,6 +37,11 @@ class Settings(BaseSettings):
     clerk_secret_key: str = ""
     clerk_publishable_key: str = ""
 
+    # ── Learner Intelligence bridge (default OFF) ────────────────────────────
+    # Shared secret for the demo→engine evidence-ingest endpoint. When empty the
+    # endpoint is disabled entirely. Set BRIDGE_INGEST_TOKEN to enable bridging.
+    bridge_ingest_token: str = ""
+
     # ── LLM ──────────────────────────────────────────────────────────────────
     groq_api_key: str
     groq_default_model: str = "llama-3.3-70b-versatile"

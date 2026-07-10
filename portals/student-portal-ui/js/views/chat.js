@@ -1,12 +1,17 @@
 import { state, setAccent, navigate, registerRoute } from '../state.js';
 import { $, esc, shade, scroll, typewriter } from '../utils.js';
-import { sendChat } from '../api.js';
+import { sendChat, nextQuestion, answerQuestion } from '../api.js';
+
+// Module-local: the outstanding inline check-question, if any. When set, the
+// next typed message answers it instead of starting a new chat turn.
+let pendingCheck = null;
 
 export function renderChapter(cid) {
   const s = state.subject;
   const c = s.chapters.find(x => x.id === cid);
   state.chapter = c;
   state.conversation = null;
+  pendingCheck = null;
   setAccent(s.color);
 
   const chips = c.summary
@@ -55,7 +60,13 @@ export function renderChapter(cid) {
 
   const input = document.getElementById('q');
   const send  = document.getElementById('send');
-  const go = () => { const v = input.value.trim(); if (v) ask(v); };
+  // The input routes to the check-answer when one is pending, else a normal ask.
+  const go = () => {
+    const v = input.value.trim();
+    if (!v) return;
+    if (pendingCheck) submitCheckAnswer(v);
+    else ask(v);
+  };
   send.onclick = go;
   input.onkeydown = e => { if (e.key === 'Enter') go(); };
   app.querySelectorAll('.chip').forEach(ch => ch.onclick = () => ask(ch.dataset.q));
@@ -65,6 +76,11 @@ export function renderChapter(cid) {
 // ── Private helpers ──────────────────────────────────────────────────────────
 
 function getThread() { return document.getElementById('thread'); }
+
+function setPlaceholder(text) {
+  const input = document.getElementById('q');
+  if (input) input.placeholder = text;
+}
 
 function pushUser(text) {
   const empty = document.getElementById('empty');
@@ -99,6 +115,8 @@ function renderDecision(d) {
       el.querySelector('.bubble').insertAdjacentHTML('beforeend',
         src + `<div class="verified">✓ Grounded in chapter</div>`);
       scroll();
+      // After the tutor finishes explaining, weave in ONE check — never mid-flow.
+      maybeAskCheck(d);
     });
     return;
   }
@@ -124,6 +142,8 @@ async function ask(question) {
   const send  = document.getElementById('send');
   if (input) input.value = '';
   if (send)  send.disabled = true;
+  // Tapping a chip / asking a new question abandons any pending check.
+  clearCheck();
 
   pushUser(question);
   const typing = pushTyping();
@@ -151,6 +171,100 @@ async function ask(question) {
     scroll();
     if (input) input.focus();
   }
+}
+
+// ── Inline check-question (Tier-1 evidence capture) ──────────────────────────
+
+async function maybeAskCheck(lastDecision) {
+  if (pendingCheck) return;
+  try {
+    const r = await nextQuestion({
+      student_id:  state.student,
+      subject_id:  state.subject.id,
+      chapter_id:  state.chapter.id,
+      last_question: lastDecision && lastDecision.question ? lastDecision.question : null,
+    });
+    if (r && r.question) pushCheck(r.question);
+  } catch {
+    /* evidence capture is best-effort — never disrupt the chat */
+  }
+}
+
+function pushCheck(q) {
+  pendingCheck = q;
+  const el = $(`
+    <div class="msg ai check" id="check-${q.id}">
+      <div class="who">Quick check</div>
+      <div class="bubble">
+        <div class="ck-q">${esc(q.question)}</div>
+        <div class="ck-actions"><button class="ck-skip" type="button">Skip</button></div>
+      </div>
+    </div>`);
+  getThread().appendChild(el);
+  el.querySelector('.ck-skip').onclick = () => { clearCheck(); setPlaceholder(`Ask about ${state.chapter.title}…`); };
+  setPlaceholder('Type your answer to the check…');
+  scroll();
+  const input = document.getElementById('q');
+  if (input) input.focus();
+}
+
+async function submitCheckAnswer(answer) {
+  const q = pendingCheck;
+  const input = document.getElementById('q');
+  const send  = document.getElementById('send');
+  if (!q) return;
+  if (input) input.value = '';
+  if (send)  send.disabled = true;
+  pendingCheck = null;   // consume before the await so double-Enter can't resubmit
+
+  pushUser(answer);
+  const typing = pushTyping();
+  try {
+    const r = await answerQuestion({ student_id: state.student, question_id: q.id, answer });
+    typing.remove();
+    renderCheckFeedback(r);
+  } catch {
+    typing.remove();
+    getThread().appendChild($(`
+      <div class="notice nic">
+        <div class="em">ℹ️</div>
+        <div><div class="t">Couldn't grade that just now — no worries, let's keep going.</div></div>
+      </div>`));
+  } finally {
+    setPlaceholder(`Ask about ${state.chapter.title}…`);
+    if (send)  send.disabled = false;
+    scroll();
+    if (input) input.focus();
+  }
+}
+
+function renderCheckFeedback(r) {
+  const ev = (r && r.evaluation) || {};
+  const tone = ev.signal === 'correct'
+    ? { cls: 'ck-good', em: '✓', head: "Nice — you've got this." }
+    : ev.signal === 'partial'
+      ? { cls: 'ck-part', em: '≈', head: 'Close — almost there.' }
+      : { cls: 'ck-miss', em: '↻', head: "Let's revisit this together." };
+
+  getThread().appendChild($(`
+    <div class="msg ai">
+      <div class="who">Tutor</div>
+      <div class="bubble ck-fb ${tone.cls}">
+        <div class="ck-head">${tone.em} ${tone.head}</div>
+        <div class="ck-detail">${esc(ev.feedback || '')}</div>
+      </div>
+    </div>`));
+  scroll();
+}
+
+function clearCheck() {
+  if (!pendingCheck) return;
+  const el = document.getElementById('check-' + pendingCheck.id);
+  if (el) {
+    const actions = el.querySelector('.ck-actions');
+    if (actions) actions.remove();
+  }
+  pendingCheck = null;
 }
 
 registerRoute('chat', renderChapter);

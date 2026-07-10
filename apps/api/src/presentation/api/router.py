@@ -7,6 +7,7 @@ from src.presentation.api.v1 import (
     documents,
     enrollment,
     library,
+    questions,
     rag,
     search,
     student,
@@ -25,6 +26,7 @@ api_router.include_router(documents.router)
 api_router.include_router(search.router)
 api_router.include_router(rag.router)
 api_router.include_router(student.router)
+api_router.include_router(questions.router)
 api_router.include_router(teacher.router)
 api_router.include_router(enrollment.router)
 api_router.include_router(admin.router)

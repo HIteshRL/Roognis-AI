@@ -207,6 +207,34 @@
   margin-top: 8px;
 }
 
+/* Inline check-question (Tier-1 evidence capture) — reads as tutoring, not a quiz */
+.msg.check .who { background: linear-gradient(135deg, #0ea5e9, var(--accent)); }
+.msg.check .bubble {
+  background: color-mix(in srgb, var(--accent) 6%, #fff);
+  border-color: color-mix(in srgb, var(--accent) 30%, #fff);
+}
+.ck-q { font-weight: 600; }
+.ck-actions { margin-top: 9px; }
+.ck-skip {
+  border: 1px solid var(--line);
+  background: #fff;
+  border-radius: 999px;
+  padding: 4px 12px;
+  font-size: 12px;
+  color: var(--muted);
+  cursor: pointer;
+}
+.ck-skip:hover { color: var(--fg); border-color: var(--accent); }
+
+.ck-fb .ck-head { font-weight: 700; font-size: 13.5px; }
+.ck-fb .ck-detail { margin-top: 4px; font-size: 13.5px; color: var(--muted); }
+.ck-fb.ck-good { background: #e8f6ee; border-color: #cdebd7; }
+.ck-fb.ck-good .ck-head { color: #166534; }
+.ck-fb.ck-part { background: #fff7e6; border-color: #f4e3ab; }
+.ck-fb.ck-part .ck-head { color: #7a5b00; }
+.ck-fb.ck-miss { background: #eef4ff; border-color: #d5e2fb; }
+.ck-fb.ck-miss .ck-head { color: #274690; }
+
 /* Typing indicator */
 .typing span {
   display: inline-block;

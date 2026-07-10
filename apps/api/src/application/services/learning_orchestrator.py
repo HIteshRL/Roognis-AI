@@ -10,12 +10,15 @@ import structlog
 from src.application.dtos.learning import ConceptExtractionResult
 from src.application.services.concept_extraction_service import ConceptExtractionService
 from src.application.services.concept_memory_service import ConceptMemoryService
+from src.application.services.evidence_collector import EvidenceCollector
 from src.application.services.learner_behavior_service import LearnerBehaviorService
 from src.application.services.learning_gap_detector import LearningGapDetector
 from src.application.services.learning_velocity_service import LearningVelocityService
 from src.application.services.mastery_engine import MasteryEngine
+from src.application.services.preference_inference_engine import PreferenceInferenceEngine
 from src.application.services.session_memory_service import SessionMemoryService
 from src.application.services.student_profile_service import StudentProfileService
+from src.domain.repositories.learning_repository import AbstractConceptNodeRepository
 
 logger = structlog.get_logger(__name__)
 
@@ -31,6 +34,9 @@ class LearningOrchestrator:
         velocity_svc: LearningVelocityService | None = None,
         behavior_svc: LearnerBehaviorService | None = None,
         concept_memory_svc: ConceptMemoryService | None = None,
+        evidence_collector: EvidenceCollector | None = None,
+        preference_engine: PreferenceInferenceEngine | None = None,
+        concept_repo: AbstractConceptNodeRepository | None = None,
     ) -> None:
         self._extractor = extractor
         self._profiles = profile_svc
@@ -40,6 +46,9 @@ class LearningOrchestrator:
         self._velocity = velocity_svc
         self._behavior = behavior_svc
         self._concept_memory = concept_memory_svc
+        self._evidence = evidence_collector
+        self._preferences = preference_engine
+        self._concepts = concept_repo
 
     async def process(
         self,
@@ -128,6 +137,17 @@ class LearningOrchestrator:
                     chapter=chapter,
                 )
 
+            # Learner Intelligence: log evidence from this chat turn + refine
+            # inferred preferences. Isolated so it never disturbs the pipeline above.
+            await self._record_learner_intelligence(
+                user_id=user_id,
+                extraction=extraction,
+                subject=subject,
+                grade=grade,
+                chapter=chapter,
+                intent=intent,
+            )
+
             logger.info(
                 "learning_pipeline_complete",
                 user_id=str(user_id),
@@ -142,6 +162,66 @@ class LearningOrchestrator:
                 error=str(exc),
                 exc_info=True,
             )
+
+    async def _record_learner_intelligence(
+        self,
+        user_id: UUID,
+        extraction: ConceptExtractionResult,
+        subject: str | None,
+        grade: str | None,
+        chapter: str | None,
+        intent: str,
+    ) -> None:
+        """Emit chat-turn evidence and refine inferred preferences. Fail-open.
+
+        Chat is *weak* evidence: a demonstrated misconception is real negative
+        evidence, but an explanation the learner merely received is neutral — we
+        log it (signal ``unknown``, zero polarity) without asserting mastery, so
+        it never inflates assessment confidence. Mastery/gap updates are owned by
+        the steps above; we deliberately do not re-apply them here.
+        """
+        had_misconception = len(extraction.misconceptions) > 0
+
+        if self._preferences:
+            try:
+                await self._preferences.infer_from_interaction(
+                    user_id=user_id,
+                    intent=intent,
+                    bloom_level=extraction.bloom_level,
+                    had_misconception=had_misconception,
+                )
+            except Exception as exc:
+                logger.warning("preference_inference_failed", error=str(exc))
+
+        if self._evidence and extraction.primary_concept:
+            try:
+                concept_id = None
+                concept_name = extraction.primary_concept
+                if self._concepts:
+                    node = await self._concepts.get_or_create(
+                        concept_name, subject, grade, chapter
+                    )
+                    concept_id = node.id
+                signal = "misconception" if had_misconception else "unknown"
+                confidence = 0.0
+                if concept_id is not None:
+                    confidence = await self._evidence.concept_confidence(user_id, concept_id)
+                await self._evidence.record(
+                    user_id=user_id,
+                    signal=signal,
+                    concept_id=concept_id,
+                    concept_name=concept_name,
+                    objective="verify_confidence",
+                    source="chat",
+                    weight=0.5 if had_misconception else 0.3,
+                    bloom_level=extraction.bloom_level,
+                    intent=intent,
+                    confidence_before=confidence,
+                    confidence_after=confidence,
+                    detail=extraction.misconceptions[0] if had_misconception else "",
+                )
+            except Exception as exc:
+                logger.warning("chat_evidence_record_failed", error=str(exc))
 
     async def _auto_resolve_gaps(self, user_id: UUID) -> None:
         mastery_records = await self._mastery.get_all(user_id)

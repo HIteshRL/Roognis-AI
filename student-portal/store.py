@@ -203,3 +203,81 @@ def list_conversations_for_classroom(classroom_id: str) -> list[dict]:
             " FROM conversations cv LEFT JOIN students s ON s.id=cv.student_id"
             " LEFT JOIN chapters ch ON ch.id=cv.chapter_id"
             " WHERE cv.classroom_id=? ORDER BY cv.updated_at DESC", (classroom_id,)))
+
+
+# ── Learner Intelligence: questions + evidence ────────────────────────────────
+def create_question(q: dict) -> dict:
+    """Persist a generated question (dict shaped like apps/api QuestionOutput)."""
+    qid = gen_id()
+    with connect() as c:
+        c.execute(
+            "INSERT INTO learner_questions(id,student_id,classroom_id,chapter_id,concept,"
+            "question,objective,purpose,difficulty,bloom_level,expected_answer,"
+            "confidence_threshold,evidence_weight,status,created_at)"
+            " VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?, 'asked', ?)",
+            (qid, q["student_id"], q.get("classroom_id"), q.get("chapter_id"), q["concept"],
+             q["question"], q.get("objective"), q.get("purpose"), q.get("difficulty"),
+             q.get("bloom_level"), q.get("expected_answer"), q.get("confidence_threshold", 0.6),
+             q.get("evidence_weight", 1.0), now()),
+        )
+        c.commit()
+    return get_question(qid)
+
+
+def get_question(qid: str) -> dict | None:
+    with connect() as c:
+        return _row(c.execute("SELECT * FROM learner_questions WHERE id=?", (qid,)))
+
+
+def next_pending_question(student_id: str) -> dict | None:
+    with connect() as c:
+        return _row(c.execute(
+            "SELECT * FROM learner_questions WHERE student_id=? AND status IN ('asked','pending')"
+            " ORDER BY created_at LIMIT 1", (student_id,)))
+
+
+def record_answer(qid: str, answer: str, is_correct: bool, score: float, feedback: str) -> dict | None:
+    with connect() as c:
+        c.execute(
+            "UPDATE learner_questions SET status='evaluated', student_answer=?, is_correct=?,"
+            " score=?, feedback=?, answered_at=? WHERE id=?",
+            (answer, 1 if is_correct else 0, score, feedback, now(), qid),
+        )
+        c.commit()
+    return get_question(qid)
+
+
+def list_questions(student_id: str, limit: int = 20) -> list[dict]:
+    with connect() as c:
+        return _rows(c.execute(
+            "SELECT * FROM learner_questions WHERE student_id=? ORDER BY created_at DESC LIMIT ?",
+            (student_id, limit)))
+
+
+def add_evidence(ev: dict) -> str:
+    eid = gen_id()
+    with connect() as c:
+        c.execute(
+            "INSERT INTO learner_evidence(id,student_id,concept,signal,objective,source,weight,"
+            "bloom_level,intent,question_id,detail,created_at)"
+            " VALUES(?,?,?,?,?,?,?,?,?,?,?,?)",
+            (eid, ev["student_id"], ev.get("concept"), ev["signal"], ev.get("objective"),
+             ev.get("source", "question"), ev.get("weight", 1.0), ev.get("bloom_level"),
+             ev.get("intent"), ev.get("question_id"), ev.get("detail", ""), now()),
+        )
+        c.commit()
+    return eid
+
+
+def list_evidence(student_id: str, limit: int = 100) -> list[dict]:
+    with connect() as c:
+        return _rows(c.execute(
+            "SELECT * FROM learner_evidence WHERE student_id=? ORDER BY created_at DESC LIMIT ?",
+            (student_id, limit)))
+
+
+def concept_evidence(student_id: str, concept: str) -> list[dict]:
+    with connect() as c:
+        return _rows(c.execute(
+            "SELECT * FROM learner_evidence WHERE student_id=? AND concept=? ORDER BY created_at DESC",
+            (student_id, concept)))

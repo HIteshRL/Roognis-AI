@@ -9,18 +9,22 @@ from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
 from src.application.dtos.user import UserResponse
+from src.application.services.answer_evaluator import AnswerEvaluator
 from src.application.services.auth_service import AuthService
 from src.application.services.chat_service import ChatService
 from src.application.services.classroom_service import ClassroomService
 from src.application.services.concept_extraction_service import ConceptExtractionService
 from src.application.services.concept_memory_service import ConceptMemoryService
+from src.application.services.confidence_updater import ConfidenceUpdater
 from src.application.services.context_validation_service import ContextValidationService
 from src.application.services.document_service import DocumentService
+from src.application.services.evidence_collector import EvidenceCollector
 from src.application.services.intent_engine import IntentEngine
 from src.application.services.knowledge_graph_service import KnowledgeGraphService
 from src.application.services.knowledge_library_service import KnowledgeLibraryService
 from src.application.services.learner_behavior_service import LearnerBehaviorService
 from src.application.services.learner_context_service import LearnerContextService
+from src.application.services.learner_intelligence_engine import LearnerIntelligenceEngine
 from src.application.services.learning_analytics_service import LearningAnalyticsService
 from src.application.services.learning_gap_detector import LearningGapDetector
 from src.application.services.learning_orchestrator import LearningOrchestrator
@@ -28,8 +32,13 @@ from src.application.services.learning_path_service import LearningPathService
 from src.application.services.learning_velocity_service import LearningVelocityService
 from src.application.services.mastery_engine import MasteryEngine
 from src.application.services.next_best_topic_engine import NextBestTopicEngine
+from src.application.services.preference_inference_engine import PreferenceInferenceEngine
 from src.application.services.prompt_assembly_service import PromptAssemblyService
+from src.application.services.question_generator import QuestionGenerator
+from src.application.services.question_scheduler import QuestionScheduler
+from src.application.services.questioning_engine import QuestioningEngine
 from src.application.services.rag_service import RagService
+from src.application.services.recall_scheduler import RecallScheduler
 from src.application.services.response_cache_service import ResponseCacheService
 from src.application.services.retrieval_service import RetrievalService
 from src.application.services.search_service import SearchService
@@ -69,6 +78,12 @@ from src.infrastructure.database.repositories.learning_repository import (
 from src.infrastructure.database.repositories.profile_repository import (
     ProfileRepository,
     SettingsRepository,
+)
+from src.infrastructure.database.repositories.question_repository import (
+    EvidenceRepository,
+    LearnerPreferenceRepository,
+    LearnerQuestionRepository,
+    RecallScheduleRepository,
 )
 from src.infrastructure.database.repositories.user_repository import UserRepository
 from src.infrastructure.database.session import AsyncSession, get_db
@@ -181,6 +196,10 @@ def get_chat_service(
         mastery_repo=MasteryRepository(db),
         gap_repo=LearningGapRepository(db),
         concept_memory_svc=concept_memory_svc,
+        recall_scheduler=RecallScheduler(schedule_repo=RecallScheduleRepository(db)),
+        preference_engine=PreferenceInferenceEngine(
+            preference_repo=LearnerPreferenceRepository(db)
+        ),
     )
 
     return ChatService(
@@ -335,6 +354,10 @@ def get_learning_orchestrator(
         memory_repo=ConceptMemoryRepository(db),
         concept_repo=node_repo,
     )
+    evidence_collector = EvidenceCollector(evidence_repo=EvidenceRepository(db))
+    preference_engine = PreferenceInferenceEngine(
+        preference_repo=LearnerPreferenceRepository(db)
+    )
 
     return LearningOrchestrator(
         extractor=extractor,
@@ -345,6 +368,9 @@ def get_learning_orchestrator(
         velocity_svc=velocity_svc,
         behavior_svc=behavior_svc,
         concept_memory_svc=concept_memory_svc,
+        evidence_collector=evidence_collector,
+        preference_engine=preference_engine,
+        concept_repo=node_repo,
     )
 
 
@@ -450,3 +476,87 @@ def get_learning_path_service(
 
 def get_skill_graph_service() -> SkillGraphService:
     return SkillGraphService()
+
+
+# ── Learner Intelligence: QuestionEngine + Evidence ───────────────────────────
+
+def get_evidence_collector(
+    db: Annotated[AsyncSession, Depends(get_db)],
+) -> EvidenceCollector:
+    return EvidenceCollector(evidence_repo=EvidenceRepository(db))
+
+
+def get_recall_scheduler(
+    db: Annotated[AsyncSession, Depends(get_db)],
+) -> RecallScheduler:
+    return RecallScheduler(schedule_repo=RecallScheduleRepository(db))
+
+
+def get_preference_inference_engine(
+    db: Annotated[AsyncSession, Depends(get_db)],
+) -> PreferenceInferenceEngine:
+    return PreferenceInferenceEngine(preference_repo=LearnerPreferenceRepository(db))
+
+
+def get_confidence_updater(
+    db: Annotated[AsyncSession, Depends(get_db)],
+) -> ConfidenceUpdater:
+    return ConfidenceUpdater(
+        evidence_collector=EvidenceCollector(evidence_repo=EvidenceRepository(db)),
+        recall_scheduler=RecallScheduler(schedule_repo=RecallScheduleRepository(db)),
+        mastery_repo=MasteryRepository(db),
+        concept_repo=ConceptNodeRepository(db),
+        gap_repo=LearningGapRepository(db),
+    )
+
+
+def get_questioning_engine(
+    db: Annotated[AsyncSession, Depends(get_db)],
+) -> QuestioningEngine:
+    evidence_collector = EvidenceCollector(evidence_repo=EvidenceRepository(db))
+    recall_scheduler = RecallScheduler(schedule_repo=RecallScheduleRepository(db))
+    scheduler = QuestionScheduler(
+        mastery_repo=MasteryRepository(db),
+        recall_scheduler=recall_scheduler,
+        evidence_collector=evidence_collector,
+        concept_repo=ConceptNodeRepository(db),
+        gap_repo=LearningGapRepository(db),
+    )
+    confidence_updater = ConfidenceUpdater(
+        evidence_collector=evidence_collector,
+        recall_scheduler=recall_scheduler,
+        mastery_repo=MasteryRepository(db),
+        concept_repo=ConceptNodeRepository(db),
+        gap_repo=LearningGapRepository(db),
+    )
+    return QuestioningEngine(
+        scheduler=scheduler,
+        generator=QuestionGenerator(),
+        evaluator=AnswerEvaluator(),
+        confidence_updater=confidence_updater,
+        question_repo=LearnerQuestionRepository(db),
+    )
+
+
+def get_learner_intelligence_engine(
+    db: Annotated[AsyncSession, Depends(get_db)],
+) -> LearnerIntelligenceEngine:
+    node_repo = ConceptNodeRepository(db)
+    return LearnerIntelligenceEngine(
+        mastery_repo=MasteryRepository(db),
+        gap_repo=LearningGapRepository(db),
+        preference_engine=PreferenceInferenceEngine(preference_repo=LearnerPreferenceRepository(db)),
+        recall_scheduler=RecallScheduler(schedule_repo=RecallScheduleRepository(db)),
+        concept_memory_svc=ConceptMemoryService(
+            memory_repo=ConceptMemoryRepository(db),
+            concept_repo=node_repo,
+        ),
+        recommender=NextBestTopicEngine(
+            graph=KnowledgeGraphService(
+                node_repo=node_repo,
+                edge_repo=ConceptEdgeRepository(db),
+            ),
+            mastery_repo=MasteryRepository(db),
+            profile_repo=StudentProfileRepository(db),
+        ),
+    )

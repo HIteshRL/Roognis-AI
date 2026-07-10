@@ -11,6 +11,12 @@ from src.infrastructure.database.models.knowledge import (
     KnowledgeBaseModel,
 )
 from src.infrastructure.database.models.profile import ProfileModel, SettingsModel
+from src.infrastructure.database.models.question import (
+    LearnerEvidenceModel,
+    LearnerPreferenceModel,
+    LearnerQuestionModel,
+    RecallScheduleModel,
+)
 from src.infrastructure.database.models.system import (
     ApiUsageModel,
     AuditLogModel,
@@ -38,4 +44,8 @@ __all__ = [
     "ClassroomModel",
     "ChapterModel",
     "EnrollmentModel",
+    "LearnerEvidenceModel",
+    "LearnerQuestionModel",
+    "RecallScheduleModel",
+    "LearnerPreferenceModel",
 ]
