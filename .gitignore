@@ -55,3 +55,6 @@ coverage/
 
 # Local preview scratch (not committed)
 .preview/
+
+# Student portal runtime data (SQLite DB + uploaded PDFs — never commit)
+student-portal/data/
