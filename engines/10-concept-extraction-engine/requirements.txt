@@ -1,0 +1,3 @@
+groq>=0.13
+structlog>=24
+pydantic>=2.9
