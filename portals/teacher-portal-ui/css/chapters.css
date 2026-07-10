@@ -1,0 +1,54 @@
+/* ── Chapters pane ─────────────────────────────────────────────────────── */
+.listrow {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  padding: 14px 16px;
+  margin-bottom: 10px;
+  box-shadow: var(--shadow);
+}
+
+.num {
+  width: 34px;
+  height: 34px;
+  border-radius: 10px;
+  background: #eef0ff;
+  color: var(--brand);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 800;
+  flex-shrink: 0;
+}
+
+.listrow h4 { margin: 0; font-size: 15px; }
+
+/* Uploaded documents list below each chapter row */
+.docs {
+  margin: 6px 0 0 46px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.doc {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12.5px;
+  color: var(--muted);
+}
+
+/* Document status badges */
+.stt {
+  font-size: 11px;
+  font-weight: 800;
+  padding: 2px 8px;
+  border-radius: 999px;
+}
+.stt.ready      { background: #e8f6ee; color: #166534; }
+.stt.processing { background: #fff7e6; color: #8a6d00; }
+.stt.failed     { background: #fdeceb; color: #a12119; }

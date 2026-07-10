@@ -1,0 +1,85 @@
+/* ── Design tokens ─────────────────────────────────────────────────────── */
+:root {
+  --bg:      #f4f6fb;
+  --card:    #fff;
+  --fg:      #141a2e;
+  --muted:   #657089;
+  --line:    #e6e9f2;
+  --brand:   #4f46e5;
+  --brand2:  #7c3aed;
+  --accent:  #4f46e5;
+  --shadow:  0 1px 2px rgba(20,26,46,.06), 0 8px 24px rgba(20,26,46,.06);
+  --radius:  16px;
+}
+
+/* ── Reset ─────────────────────────────────────────────────────────────── */
+*, *::before, *::after { box-sizing: border-box; }
+html, body { margin: 0; height: 100%; }
+
+body {
+  font-family: "Segoe UI", -apple-system, BlinkMacSystemFont, Roboto, Arial, sans-serif;
+  background: radial-gradient(1200px 600px at 80% -10%, #eef1ff, var(--bg) 55%);
+  color: var(--fg);
+  -webkit-font-smoothing: antialiased;
+}
+
+button { font-family: inherit; cursor: pointer; }
+
+/* ── Shared utilities ──────────────────────────────────────────────────── */
+.wrap {
+  max-width: 1000px;
+  margin: 0 auto;
+  padding: 0 20px;
+}
+
+.row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.spacer { margin-left: auto; }
+
+/* Shared button styles */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border: none;
+  border-radius: 10px;
+  background: var(--brand);
+  color: #fff;
+  font-weight: 700;
+  font-size: 13px;
+  padding: 10px 15px;
+}
+.btn:hover  { background: #4338ca; }
+.btn.ghost  { background: transparent; color: var(--muted); }
+.btn.ghost:hover { background: #eef0ff; }
+.btn.sm     { padding: 7px 11px; font-size: 12px; }
+.btn.green  { background: #1e8e3e; }
+.btn.red    { background: #d93025; }
+
+.sub  { color: var(--muted); font-size: 14px; }
+.m    { color: var(--muted); font-size: 12.5px; margin-top: 2px; }
+.hide { display: none; }
+
+input[type=file] { display: none; }
+
+/* Toast notification */
+.toast {
+  position: fixed;
+  bottom: 20px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: #141a2e;
+  color: #fff;
+  padding: 10px 16px;
+  border-radius: 9px;
+  font-size: 13px;
+  opacity: 0;
+  transition: .2s;
+  z-index: 60;
+  pointer-events: none;
+}
+.toast.show { opacity: 1; }

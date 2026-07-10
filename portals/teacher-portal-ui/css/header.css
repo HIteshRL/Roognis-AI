@@ -1,0 +1,49 @@
+/* ── Sticky header ─────────────────────────────────────────────────────── */
+header {
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  background: rgba(255,255,255,.75);
+  backdrop-filter: blur(8px);
+  border-bottom: 1px solid var(--line);
+}
+
+.hbar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  height: 60px;
+}
+
+.logo {
+  width: 30px;
+  height: 30px;
+  border-radius: 9px;
+  background: linear-gradient(135deg, var(--brand), var(--brand2));
+  flex-shrink: 0;
+}
+
+.brand {
+  font-weight: 800;
+  font-size: 18px;
+  letter-spacing: -.02em;
+}
+
+.pill {
+  font-size: 12px;
+  font-weight: 700;
+  color: #4338ca;
+  background: #eef0ff;
+  border: 1px solid #e0e3ff;
+  padding: 4px 10px;
+  border-radius: 999px;
+}
+
+.rightlink {
+  margin-left: auto;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--muted);
+  text-decoration: none;
+}
+.rightlink:hover { color: var(--fg); }
