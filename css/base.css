@@ -1,0 +1,35 @@
+/* ── Design tokens ─────────────────────────────────────────────────────── */
+:root {
+  --bg:      #f4f6fb;
+  --card:    #ffffff;
+  --fg:      #141a2e;
+  --muted:   #657089;
+  --line:    #e6e9f2;
+  --brand:   #4f46e5;
+  --brand2:  #7c3aed;
+  --accent:  #4f46e5;   /* overridden per-subject via JS */
+  --shadow:  0 1px 2px rgba(20,26,46,.06), 0 8px 24px rgba(20,26,46,.06);
+  --radius:  18px;
+}
+
+/* ── Reset ─────────────────────────────────────────────────────────────── */
+*, *::before, *::after { box-sizing: border-box; }
+html, body { margin: 0; height: 100%; }
+
+body {
+  font-family: "Segoe UI", -apple-system, BlinkMacSystemFont, Roboto, Helvetica, Arial, sans-serif;
+  background: radial-gradient(1200px 600px at 80% -10%, #eef1ff 0%, var(--bg) 55%);
+  color: var(--fg);
+  -webkit-font-smoothing: antialiased;
+}
+
+button { font-family: inherit; cursor: pointer; }
+
+/* ── Layout shell ──────────────────────────────────────────────────────── */
+.wrap {
+  max-width: 1080px;
+  margin: 0 auto;
+  padding: 0 20px;
+}
+
+.hidden { display: none; }

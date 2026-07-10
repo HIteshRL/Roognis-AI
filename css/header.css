@@ -1,0 +1,63 @@
+/* ── Sticky header ─────────────────────────────────────────────────────── */
+header {
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  backdrop-filter: saturate(1.4) blur(8px);
+  background: rgba(255,255,255,.72);
+  border-bottom: 1px solid var(--line);
+}
+
+.hbar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  height: 60px;
+}
+
+.logo {
+  width: 30px;
+  height: 30px;
+  border-radius: 9px;
+  background: linear-gradient(135deg, var(--brand), var(--brand2));
+  box-shadow: 0 4px 12px rgba(79,70,229,.35);
+  flex-shrink: 0;
+}
+
+.brand {
+  font-weight: 800;
+  font-size: 18px;
+  letter-spacing: -.02em;
+}
+
+.pill {
+  font-size: 12px;
+  font-weight: 700;
+  color: #4338ca;
+  background: #eef0ff;
+  border: 1px solid #e0e3ff;
+  padding: 4px 10px;
+  border-radius: 999px;
+}
+
+/* Online / offline mode badge */
+.mode {
+  margin-left: auto;
+  font-size: 12px;
+  font-weight: 700;
+  padding: 5px 11px;
+  border-radius: 999px;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+.mode.online  { color: #166534; background: #e8f6ee; border: 1px solid #cdebd7; }
+.mode.offline { color: #8a6d00; background: #fff7e6; border: 1px solid #f4e3ab; }
+
+.dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: currentColor;
+  box-shadow: 0 0 0 3px rgba(0,0,0,.06);
+}

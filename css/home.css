@@ -1,0 +1,81 @@
+/* ── Home — subject grid ───────────────────────────────────────────────── */
+.hero {
+  padding: 34px 0 8px;
+}
+.hero h1 {
+  font-size: 30px;
+  letter-spacing: -.03em;
+  margin: 0 0 6px;
+}
+.hero p {
+  color: var(--muted);
+  margin: 0;
+  font-size: 15px;
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(232px, 1fr));
+  gap: 18px;
+  padding: 22px 0 40px;
+}
+
+.subject {
+  position: relative;
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 18px;
+  box-shadow: var(--shadow);
+  cursor: pointer;
+  transition: transform .16s ease, box-shadow .16s ease;
+  overflow: hidden;
+}
+.subject:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 12px 30px rgba(20,26,46,.12);
+}
+.subject .glow {
+  position: absolute;
+  inset: -40% 40% auto -20%;
+  height: 120px;
+  border-radius: 50%;
+  filter: blur(36px);
+  opacity: .22;
+  pointer-events: none;
+}
+.subject .go {
+  position: absolute;
+  top: 18px;
+  right: 16px;
+  color: var(--muted);
+  font-size: 18px;
+  transition: transform .16s;
+}
+.subject:hover .go {
+  transform: translateX(3px);
+  color: var(--accent);
+}
+.subject h3 {
+  margin: 14px 0 2px;
+  font-size: 17px;
+  letter-spacing: -.01em;
+}
+.subject .meta {
+  color: var(--muted);
+  font-size: 13px;
+}
+
+/* Shared subject icon */
+.ic {
+  width: 52px;
+  height: 52px;
+  border-radius: 15px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 26px;
+  color: #fff;
+  box-shadow: 0 8px 18px rgba(0,0,0,.14);
+  flex-shrink: 0;
+}
