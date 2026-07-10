@@ -1,0 +1,72 @@
+/* ── Classes home grid ─────────────────────────────────────────────────── */
+h1 {
+  font-size: 26px;
+  letter-spacing: -.02em;
+  margin: 26px 0 2px;
+}
+
+/* Class card grid */
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 16px;
+  padding: 20px 0 40px;
+}
+
+/* Class card */
+.cc {
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  overflow: hidden;
+  box-shadow: var(--shadow);
+  cursor: pointer;
+  transition: transform .15s, box-shadow .15s;
+}
+.cc:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 12px 30px rgba(20,26,46,.12);
+}
+
+/* Coloured banner inside the card */
+.cc .ban {
+  height: 78px;
+  padding: 14px;
+  color: #fff;
+  position: relative;
+}
+.cc .ban h3 { margin: 0; font-size: 17px; }
+.cc .ban .s { font-size: 12.5px; color: rgba(255,255,255,.85); }
+
+/* Circular monogram icon overlapping the banner / body boundary */
+.cc .mono {
+  position: absolute;
+  right: 14px;
+  bottom: -22px;
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  border: 3px solid #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 22px;
+}
+
+/* Card metadata row */
+.cc .body {
+  padding: 22px 14px 12px;
+  color: var(--muted);
+  font-size: 12.5px;
+  display: flex;
+  gap: 14px;
+}
+
+/* Empty state */
+.empty {
+  border: 1px dashed var(--line);
+  border-radius: var(--radius);
+  padding: 50px;
+  text-align: center;
+  color: var(--muted);
+}
