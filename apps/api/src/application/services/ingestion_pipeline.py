@@ -5,19 +5,17 @@ Orchestrates the full document ingestion pipeline:
 Designed to run as a FastAPI BackgroundTask.
 Each step updates the IngestionJob record so the frontend can poll progress.
 """
-import structlog
+from typing import TYPE_CHECKING
 from uuid import UUID
 
-from sqlalchemy.ext.asyncio import AsyncSession
+import structlog
+
+if TYPE_CHECKING:
+    from src.application.services.vision_ocr_service import VisionOCRService
 
 from src.application.services.chunking_service import ChunkingService
 from src.application.services.vector_service import VectorService
 from src.domain.entities.knowledge import DocumentChunk
-from src.domain.repositories.knowledge_repository import (
-    AbstractChunkRepository,
-    AbstractDocumentRepository,
-    AbstractIngestionJobRepository,
-)
 from src.infrastructure.database.repositories.knowledge_repository import (
     ChunkRepository,
     DocumentRepository,
@@ -40,6 +38,7 @@ class IngestionPipeline:
         chunk_size: int = 512,
         chunk_overlap: int = 64,
         chunk_strategy: str = "fixed",
+        vision_ocr_svc: "VisionOCRService | None" = None,
     ) -> None:
         self._vector_store = vector_store
         self._embedding_provider = embedding_provider
@@ -49,6 +48,7 @@ class IngestionPipeline:
             strategy=chunk_strategy,  # type: ignore[arg-type]
         )
         self._vector_svc = VectorService(vector_store, embedding_provider)
+        self._ocr = vision_ocr_svc
 
     async def run(self, document_id: UUID, storage_path: str, file_type: str) -> None:
         """Entry point called by BackgroundTask. Opens its own DB session."""
@@ -88,6 +88,19 @@ class IngestionPipeline:
                 parser = get_parser(storage_path, file_type)
                 parsed = await parser.parse(storage_path)
                 logger.info("document_parsed", pages=parsed.total_pages)
+
+                # Step 1b — Vision OCR enrichment (Phase 0.6)
+                # Scanned PDFs / uploaded images have no text layer; transcribe
+                # their pages so they become searchable. Fail-open: OCR errors
+                # leave the original content and ingestion continues.
+                if self._ocr:
+                    parsed = await self._ocr.enrich(parsed, storage_path, file_type)
+                    if parsed.metadata.get("ocr_applied"):
+                        logger.info(
+                            "document_ocr_enriched",
+                            document_id=str(document_id),
+                            ocr_pages=parsed.metadata.get("ocr_pages", 0),
+                        )
 
                 # Step 2 — Chunking
                 job.advance("chunking", 30)

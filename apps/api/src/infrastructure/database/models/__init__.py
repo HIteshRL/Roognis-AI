@@ -1,3 +1,8 @@
+from src.infrastructure.database.models.classroom import (
+    ChapterModel,
+    ClassroomModel,
+    EnrollmentModel,
+)
 from src.infrastructure.database.models.conversation import ConversationModel, MessageModel
 from src.infrastructure.database.models.knowledge import (
     DocumentChunkModel,
@@ -30,4 +35,7 @@ __all__ = [
     "DocumentModel",
     "DocumentChunkModel",
     "IngestionJobModel",
+    "ClassroomModel",
+    "ChapterModel",
+    "EnrollmentModel",
 ]

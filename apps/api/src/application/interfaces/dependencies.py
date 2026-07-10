@@ -11,6 +11,7 @@ from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from src.application.dtos.user import UserResponse
 from src.application.services.auth_service import AuthService
 from src.application.services.chat_service import ChatService
+from src.application.services.classroom_service import ClassroomService
 from src.application.services.concept_extraction_service import ConceptExtractionService
 from src.application.services.concept_memory_service import ConceptMemoryService
 from src.application.services.context_validation_service import ContextValidationService
@@ -37,9 +38,15 @@ from src.application.services.skill_graph_service import SkillGraphService
 from src.application.services.student_profile_service import StudentProfileService
 from src.application.services.user_service import UserService
 from src.application.services.vector_service import VectorService
+from src.application.services.vision_ocr_service import VisionOCRService
 from src.config import Settings, get_settings
 from src.domain.exceptions import AuthenticationError
 from src.infrastructure.cache.redis_client import get_redis
+from src.infrastructure.database.repositories.classroom_repository import (
+    ChapterRepository,
+    ClassroomRepository,
+    EnrollmentRepository,
+)
 from src.infrastructure.database.repositories.conversation_repository import (
     ConversationRepository,
     MessageRepository,
@@ -70,6 +77,7 @@ from src.infrastructure.llm.factory import get_llm_provider
 from src.infrastructure.llm.prompt_loader import PromptLoader
 from src.infrastructure.storage.local_storage import LocalFileStorage
 from src.infrastructure.vector.factory import get_vector_store
+from src.infrastructure.vision.factory import get_vision_provider
 
 logger = structlog.get_logger(__name__)
 _bearer = HTTPBearer(auto_error=False)
@@ -116,6 +124,19 @@ async def require_admin(
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail={"code": "FORBIDDEN", "message": "Admin access required"},
+        )
+    return current_user
+
+
+async def require_teacher(
+    current_user: Annotated[UserResponse, Depends(get_current_user)],
+) -> UserResponse:
+    if getattr(current_user, "role", "student") != "teacher" and not getattr(
+        current_user, "is_admin", False
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail={"code": "FORBIDDEN", "message": "Teacher access required"},
         )
     return current_user
 
@@ -208,6 +229,36 @@ def get_document_service(
         storage=LocalFileStorage(settings.storage_local_path),
         vector_svc=vector_svc,
         settings=settings,
+    )
+
+
+def get_vision_ocr_service(settings: Settings | None = None) -> VisionOCRService:
+    """Vision OCR enrichment for the ingestion pipeline (Phase 0.6).
+
+    Callable both as a FastAPI dependency and directly from route-level pipeline
+    builders, so ``settings`` is optional and resolved from the cache when absent.
+    """
+    settings = settings or get_settings()
+    return VisionOCRService(
+        vision_provider=get_vision_provider(),
+        enabled=settings.ocr_enabled,
+        min_chars_per_page=settings.ocr_min_chars_per_page,
+        max_pages=settings.ocr_max_pages,
+        max_image_dimension=settings.ocr_max_image_dimension,
+        image_format=settings.ocr_image_format,
+    )
+
+
+def get_classroom_service(
+    db: Annotated[AsyncSession, Depends(get_db)],
+) -> ClassroomService:
+    return ClassroomService(
+        classroom_repo=ClassroomRepository(db),
+        chapter_repo=ChapterRepository(db),
+        enrollment_repo=EnrollmentRepository(db),
+        kb_repo=KnowledgeBaseRepository(db),
+        user_repo=UserRepository(db),
+        doc_repo=DocumentRepository(db),
     )
 
 

@@ -8,12 +8,14 @@ from src.application.dtos.chat import SendMessageRequest
 from src.application.dtos.user import UserResponse
 from src.application.interfaces.dependencies import (
     get_chat_service,
+    get_classroom_service,
     get_current_user,
     get_intent_engine,
     get_learning_orchestrator,
     get_user_service,
 )
 from src.application.services.chat_service import ChatService
+from src.application.services.classroom_service import ClassroomService
 from src.application.services.intent_engine import IntentEngine
 from src.application.services.learning_orchestrator import LearningOrchestrator
 from src.application.services.user_service import UserService
@@ -32,12 +34,20 @@ async def send_message(
     user_svc: Annotated[UserService, Depends(get_user_service)],
     orchestrator: Annotated[LearningOrchestrator, Depends(get_learning_orchestrator)],
     intent_engine: Annotated[IntentEngine, Depends(get_intent_engine)],
+    classroom_svc: Annotated[ClassroomService, Depends(get_classroom_service)],
 ) -> StreamingResponse:
     user_settings = await user_svc.get_settings(UUID(current_user.id))
     collected_response: list[str] = []
     user_id = UUID(current_user.id)
     question = body.message
     conversation_id = body.conversation_id
+
+    # Chapter-scoped inference: resolve the chapter to its knowledge base (and
+    # enforce that the student is enrolled) so retrieval is bounded to it.
+    knowledge_base_id: str | None = None
+    if body.chapter_id:
+        kb_id = await classroom_svc.resolve_chapter_kb_for_student(user_id, body.chapter_id)
+        knowledge_base_id = str(kb_id) if kb_id else None
 
     # Classify intent synchronously before streaming — used in system prompt and session record
     current_intent = intent_engine.classify(question)
@@ -49,6 +59,7 @@ async def send_message(
             llm_model=user_settings.llm_model,
             temperature=user_settings.temperature,
             current_intent=current_intent,
+            knowledge_base_id=knowledge_base_id,
         ):
             collected_response.append(chunk)
             yield chunk

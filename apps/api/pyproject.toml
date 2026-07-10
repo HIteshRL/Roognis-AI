@@ -32,6 +32,8 @@ dependencies = [
   "markdown==3.7",
   "beautifulsoup4==4.12.3",
   "aiofiles==24.1.0",
+  # ── Phase 0.6 — Vision OCR (image normalisation for scanned docs) ─────────────
+  "pillow==11.0.0",
   # ── Phase 0.2 — Chunking ─────────────────────────────────────────────────────
   "tiktoken==0.8.0",
   # ── Phase 0.2 — Embeddings ───────────────────────────────────────────────────

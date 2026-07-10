@@ -48,6 +48,7 @@ class AuthService:
             email=dto.email,
             username=dto.username,
             password_hash=_pwd_context.hash(dto.password),
+            role=dto.role,
         )
         user = await self._users.create(user)
 
@@ -130,6 +131,7 @@ class AuthService:
             is_active=user.is_active,
             is_verified=user.is_verified,
             is_admin=user.is_admin,
+            role=user.role,
             created_at=user.created_at.isoformat(),
             updated_at=user.updated_at.isoformat(),
         )

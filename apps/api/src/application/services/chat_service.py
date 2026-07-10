@@ -57,6 +57,7 @@ class ChatService:
         llm_model: str,
         temperature: float,
         current_intent: str = "unknown",
+        knowledge_base_id: str | None = None,
     ) -> AsyncGenerator[str, None]:
         conversation = await self._get_or_create_conversation(user_id, dto.conversation_id)
 
@@ -88,7 +89,9 @@ class ChatService:
 
         # ── RAG: retrieve context, build grounded prompt ──────────────────────
         if self._retrieval_enabled and self._retrieval and self._prompt_assembly:
-            raw_context, _timing = await self._retrieval.retrieve(dto.message)
+            raw_context, _timing = await self._retrieval.retrieve(
+                dto.message, knowledge_base_id=knowledge_base_id
+            )
             if self._context_validation:
                 context = self._context_validation.validate(raw_context)
             else:

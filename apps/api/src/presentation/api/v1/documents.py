@@ -12,6 +12,7 @@ from src.application.interfaces.dependencies import (
     get_current_user,
     get_document_service,
     get_settings,
+    get_vision_ocr_service,
     require_admin,
 )
 from src.application.services.document_service import DocumentService
@@ -31,6 +32,7 @@ def _make_pipeline(settings: Settings) -> IngestionPipeline:
         chunk_size=settings.chunk_size,
         chunk_overlap=settings.chunk_overlap,
         chunk_strategy=settings.chunk_strategy,
+        vision_ocr_svc=get_vision_ocr_service(settings),
     )
 
 

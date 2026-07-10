@@ -4,6 +4,7 @@ from pydantic import UUID4, BaseModel, Field
 class SendMessageRequest(BaseModel):
     message: str = Field(min_length=1, max_length=32000)
     conversation_id: UUID4 | None = None
+    chapter_id: UUID4 | None = None  # scope inference to a classroom chapter's content
 
 
 class ConversationResponse(BaseModel):

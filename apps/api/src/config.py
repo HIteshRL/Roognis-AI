@@ -81,6 +81,20 @@ class Settings(BaseSettings):
     storage_local_path: str = "./uploads"
     max_upload_size_mb: int = 50
 
+    # ── Phase 0.6: Vision / OCR ──────────────────────────────────────────────
+    # Scanned PDFs and uploaded images have no text layer. When enabled, pages
+    # with little or no extractable text are sent to a Groq vision model that
+    # transcribes them so the content becomes RAG-searchable. Fail-open: any
+    # OCR error leaves the original (possibly empty) page text untouched.
+    ocr_enabled: bool = True
+    vision_provider: Literal["groq"] = "groq"
+    vision_model: str = "meta-llama/llama-4-scout-17b-16e-instruct"
+    ocr_min_chars_per_page: int = 20
+    ocr_max_pages: int = 40
+    ocr_max_image_dimension: int = 1536
+    ocr_image_format: Literal["jpeg", "png"] = "jpeg"
+    ocr_temperature: float = 0.0
+
     @property
     def is_production(self) -> bool:
         return self.app_env == "production"

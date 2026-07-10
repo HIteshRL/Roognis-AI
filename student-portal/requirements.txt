@@ -1,0 +1,9 @@
+# Student portal — runs fully offline (no key/infra). Groq is optional.
+fastapi>=0.115
+uvicorn[standard]>=0.32
+python-multipart>=0.0.12   # PDF upload (teacher)
+pydantic>=2.9
+pydantic-settings>=2.6
+structlog>=24
+groq>=0.13          # only used when GROQ_API_KEY is set (live LLM answers)
+# The RAG engine itself is imported from ../rag-standalone (no install needed).

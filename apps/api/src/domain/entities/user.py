@@ -12,9 +12,14 @@ class User:
     is_active: bool = True
     is_verified: bool = False
     is_admin: bool = False
+    role: str = "student"  # student | teacher | admin
     clerk_id: str | None = None
     created_at: datetime = field(default_factory=lambda: datetime.now(UTC))
     updated_at: datetime = field(default_factory=lambda: datetime.now(UTC))
+
+    @property
+    def is_teacher(self) -> bool:
+        return self.role == "teacher"
 
     def deactivate(self) -> None:
         self.is_active = False
