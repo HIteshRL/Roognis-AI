@@ -1,0 +1,12 @@
+# Copy to ~/.cloudflared/config.yml and edit the two marked lines.
+# Produced after: cloudflared tunnel login && cloudflared tunnel create roognis
+tunnel: roognis
+credentials-file: /home/ubuntu/.cloudflared/REPLACE-WITH-TUNNEL-ID.json   # <-- from `tunnel create`
+
+ingress:
+  # Your stable public hostname -> the local app. Route it once with:
+  #   cloudflared tunnel route dns roognis demo.yourdomain.com
+  - hostname: demo.yourdomain.com                                          # <-- your domain
+    service: http://localhost:5050
+  # Catch-all (required, must be last)
+  - service: http_status:404

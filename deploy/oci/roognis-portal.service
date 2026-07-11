@@ -1,0 +1,19 @@
+# REFERENCE ONLY — deploy.sh generates the canonical unit with your real paths.
+# Shown here so you can read/audit what gets installed. Replace __REPO__, __USER__,
+# __PORT__ if you install it by hand instead of running deploy.sh.
+[Unit]
+Description=Roognis MVP — student + teacher portal (FastAPI + SQLite)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=__USER__
+WorkingDirectory=__REPO__/student-portal
+EnvironmentFile=__REPO__/deploy/oci/.env
+ExecStart=__REPO__/.venv/bin/uvicorn app:app --host 127.0.0.1 --port __PORT__ --workers 1
+Restart=always
+RestartSec=3
+
+[Install]
+WantedBy=multi-user.target

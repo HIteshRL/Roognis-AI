@@ -1,0 +1,23 @@
+# Cloudflare named-tunnel service (stable HTTPS URL).
+# Install AFTER you have run `cloudflared tunnel create roognis` and written
+# ~/.cloudflared/config.yml (see cloudflared-config.example.yml + README step 5B):
+#
+#   sudo cp deploy/oci/roognis-tunnel.service /etc/systemd/system/
+#   sudo sed -i "s/__USER__/$USER/" /etc/systemd/system/roognis-tunnel.service
+#   sudo systemctl daemon-reload && sudo systemctl enable --now roognis-tunnel
+#
+# (Alternatively `sudo cloudflared service install` generates its own unit.)
+[Unit]
+Description=Roognis Cloudflare Tunnel
+After=network-online.target roognis-portal.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=__USER__
+ExecStart=/usr/bin/cloudflared --no-autoupdate tunnel run roognis
+Restart=always
+RestartSec=3
+
+[Install]
+WantedBy=multi-user.target
