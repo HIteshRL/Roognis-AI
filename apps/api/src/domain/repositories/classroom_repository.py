@@ -25,6 +25,15 @@ class AbstractClassroomRepository(ABC):
     async def delete(self, classroom_id: UUID) -> None: ...
 
     @abstractmethod
+    async def list_all(
+        self,
+        page: int = 1,
+        limit: int = 50,
+        search: str | None = None,
+        include_deleted: bool = False,
+    ) -> tuple[list[Classroom], int]: ...
+
+    @abstractmethod
     async def count_students(self, classroom_id: UUID) -> int: ...
 
     @abstractmethod
@@ -59,13 +68,18 @@ class AbstractEnrollmentRepository(ABC):
     async def get(self, classroom_id: UUID, student_id: UUID) -> Enrollment | None: ...
 
     @abstractmethod
-    async def list_students(self, classroom_id: UUID) -> list[User]: ...
+    async def list_students(self, classroom_id: UUID, status: str = "active") -> list[User]: ...
 
     @abstractmethod
     async def list_classrooms_for_student(self, student_id: UUID) -> list[Classroom]: ...
 
     @abstractmethod
-    async def is_enrolled(self, classroom_id: UUID, student_id: UUID) -> bool: ...
+    async def is_enrolled(self, classroom_id: UUID, student_id: UUID) -> bool:
+        """True only for an *active* enrollment — pending/removed don't count."""
+        ...
+
+    @abstractmethod
+    async def set_status(self, classroom_id: UUID, student_id: UUID, status: str) -> None: ...
 
     @abstractmethod
     async def delete(self, classroom_id: UUID, student_id: UUID) -> None: ...

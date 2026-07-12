@@ -14,7 +14,7 @@ is fail-open so a partial signal never blanks the whole context.
 """
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
-from typing import Any
+from typing import Protocol
 from uuid import UUID
 
 import structlog
@@ -30,6 +30,17 @@ logger = structlog.get_logger(__name__)
 
 _WEAK_MASTERY = 60.0
 _MAX_ITEMS = 5
+
+
+# Narrow structural interfaces (ISP): the engine depends only on the one method it
+# calls on each optional collaborator, not on the concrete service. Structural
+# typing keeps this decoupled without importing those services (no circular import).
+class StrugglingConceptsSource(Protocol):
+    async def get_struggling_concepts(self, user_id: UUID) -> list: ...
+
+
+class ConceptRecommender(Protocol):
+    async def recommend(self, user_id: UUID) -> list: ...
 
 
 @dataclass
@@ -50,8 +61,8 @@ class LearnerIntelligenceEngine:
         gap_repo: AbstractLearningGapRepository,
         preference_engine: PreferenceInferenceEngine,
         recall_scheduler: RecallScheduler,
-        concept_memory_svc: Any = None,   # ConceptMemoryService | None
-        recommender: Any = None,          # NextBestTopicEngine | None
+        concept_memory_svc: StrugglingConceptsSource | None = None,
+        recommender: ConceptRecommender | None = None,
     ) -> None:
         self._mastery = mastery_repo
         self._gaps = gap_repo

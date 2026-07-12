@@ -6,6 +6,7 @@ shares a join code. Students enrol with the code and run chapter-scoped
 inference. Each chapter wraps a KnowledgeBase, so teacher content upload and
 student RAG reuse the existing document/retrieval stack unchanged.
 """
+import secrets
 from uuid import UUID
 
 import structlog
@@ -13,9 +14,12 @@ import structlog
 from src.application.dtos.classroom import (
     ChapterResponse,
     ClassroomResponse,
+    CoTeacherResponse,
     CreateChapterRequest,
     CreateClassroomRequest,
     EnrolledStudentResponse,
+    InvitationResponse,
+    PendingEnrollmentResponse,
     StudentClassroomResponse,
     UpdateChapterRequest,
     UpdateClassroomRequest,
@@ -28,7 +32,8 @@ from src.domain.entities.classroom import (
     generate_join_code,
 )
 from src.domain.entities.knowledge import KnowledgeBase
-from src.domain.exceptions import AuthorizationError, EntityNotFound
+from src.domain.entities.lms import ClassroomInvitation, ClassroomTeacher
+from src.domain.exceptions import AuthorizationError, DuplicateEntity, EntityNotFound
 from src.domain.repositories.classroom_repository import (
     AbstractChapterRepository,
     AbstractClassroomRepository,
@@ -37,6 +42,10 @@ from src.domain.repositories.classroom_repository import (
 from src.domain.repositories.knowledge_repository import (
     AbstractDocumentRepository,
     AbstractKnowledgeBaseRepository,
+)
+from src.domain.repositories.lms_repository import (
+    AbstractClassroomTeacherRepository,
+    AbstractInvitationRepository,
 )
 from src.domain.repositories.user_repository import AbstractUserRepository
 
@@ -54,6 +63,9 @@ class ClassroomService:
         kb_repo: AbstractKnowledgeBaseRepository,
         user_repo: AbstractUserRepository,
         doc_repo: AbstractDocumentRepository,
+        teacher_repo: AbstractClassroomTeacherRepository | None = None,
+        invitation_repo: AbstractInvitationRepository | None = None,
+        notification_svc=None,  # NotificationService; Any to avoid intra-package import
     ) -> None:
         self._classrooms = classroom_repo
         self._chapters = chapter_repo
@@ -61,6 +73,9 @@ class ClassroomService:
         self._kbs = kb_repo
         self._users = user_repo
         self._docs = doc_repo
+        self._teachers = teacher_repo
+        self._invitations = invitation_repo
+        self._notify = notification_svc
 
     # ── Classrooms ───────────────────────────────────────────────────────────
 
@@ -80,15 +95,33 @@ class ClassroomService:
             description=dto.description,
             color=color,
             join_code=await self._unique_join_code(),
+            semester=dto.semester,
+            institution_id=UUID(dto.institution_id) if dto.institution_id else None,
+            banner_url=dto.banner_url,
+            settings=dto.settings or {},
         )
         classroom = await self._classrooms.create(classroom)
+        if self._teachers:
+            await self._teachers.add(
+                ClassroomTeacher(classroom_id=classroom.id, teacher_id=teacher_id, role="owner")
+            )
         logger.info("classroom_created", classroom_id=str(classroom.id), teacher_id=str(teacher_id))
         return self._classroom_to_response(classroom, student_count=0, chapter_count=0)
 
     async def list_teacher_classrooms(self, teacher_id: UUID) -> list[ClassroomResponse]:
         classrooms = await self._classrooms.list_by_teacher(teacher_id)
+        seen = {c.id for c in classrooms}
+        if self._teachers:
+            for classroom_id in await self._teachers.list_classroom_ids_for_teacher(teacher_id):
+                if classroom_id in seen:
+                    continue
+                co_taught = await self._classrooms.get_by_id(classroom_id)
+                if co_taught and not co_taught.is_archived and not co_taught.is_deleted:
+                    classrooms.append(co_taught)
         out: list[ClassroomResponse] = []
         for c in classrooms:
+            if c.is_deleted:
+                continue
             students = await self._classrooms.count_students(c.id)
             chapters = await self._classrooms.count_chapters(c.id)
             out.append(self._classroom_to_response(c, students, chapters))
@@ -106,10 +139,36 @@ class ClassroomService:
         self, teacher_id: UUID, classroom_id: UUID, dto: UpdateClassroomRequest
     ) -> ClassroomResponse:
         classroom = await self._owned_classroom(teacher_id, classroom_id)
-        for field_name in ("name", "subject", "section", "room", "grade", "description", "color"):
+        for field_name in (
+            "name", "subject", "section", "room", "grade", "description", "color",
+            "semester", "banner_url", "settings",
+        ):
             value = getattr(dto, field_name)
             if value is not None:
                 setattr(classroom, field_name, value)
+        if dto.institution_id is not None:
+            classroom.institution_id = UUID(dto.institution_id) if dto.institution_id else None
+        classroom = await self._classrooms.update(classroom)
+        students = await self._classrooms.count_students(classroom.id)
+        chapters = await self._classrooms.count_chapters(classroom.id)
+        return self._classroom_to_response(classroom, students, chapters)
+
+    async def delete_classroom(self, teacher_id: UUID, classroom_id: UUID) -> None:
+        """Soft delete — owner only. Data stays recoverable by an admin."""
+        classroom = await self._classrooms.get_by_id(classroom_id)
+        if not classroom or classroom.is_deleted:
+            raise EntityNotFound("Classroom not found")
+        if classroom.teacher_id != teacher_id:
+            raise AuthorizationError("Only the classroom owner can delete it")
+        classroom.soft_delete()
+        await self._classrooms.update(classroom)
+        logger.info("classroom_deleted", classroom_id=str(classroom_id))
+
+    async def set_join_code_enabled(
+        self, teacher_id: UUID, classroom_id: UUID, enabled: bool
+    ) -> ClassroomResponse:
+        classroom = await self._owned_classroom(teacher_id, classroom_id)
+        classroom.join_code_enabled = enabled
         classroom = await self._classrooms.update(classroom)
         students = await self._classrooms.count_students(classroom.id)
         chapters = await self._classrooms.count_chapters(classroom.id)
@@ -127,6 +186,206 @@ class ClassroomService:
         students = await self._classrooms.count_students(classroom.id)
         chapters = await self._classrooms.count_chapters(classroom.id)
         return self._classroom_to_response(classroom, students, chapters)
+
+    # ── Co-teachers & invitations ────────────────────────────────────────────
+
+    async def invite(
+        self, teacher_id: UUID, classroom_id: UUID, email: str, role: str
+    ) -> InvitationResponse:
+        if not self._invitations:
+            raise EntityNotFound("Invitations are not enabled")
+        classroom = await self._owned_classroom(teacher_id, classroom_id)
+        invitation = await self._invitations.create(
+            ClassroomInvitation(
+                classroom_id=classroom_id,
+                email=email,
+                invited_by=teacher_id,
+                role=role,
+                token=secrets.token_urlsafe(24),
+            )
+        )
+        invitee = await self._users.get_by_email(email)
+        if invitee and self._notify:
+            await self._notify.emit(
+                user_id=invitee.id,
+                type="classroom_invitation",
+                title=f"You've been invited to {classroom.name}",
+                body=f"Role: {role.replace('_', ' ')}",
+                data={"classroom_id": str(classroom_id), "invitation_id": str(invitation.id)},
+            )
+        logger.info(
+            "classroom_invited", classroom_id=str(classroom_id), role=role,
+        )
+        return self._invitation_to_response(invitation)
+
+    async def list_invitations(
+        self, teacher_id: UUID, classroom_id: UUID, status: str | None = None
+    ) -> list[InvitationResponse]:
+        if not self._invitations:
+            return []
+        await self._owned_classroom(teacher_id, classroom_id)
+        invitations = await self._invitations.list_by_classroom(classroom_id, status=status)
+        return [self._invitation_to_response(i) for i in invitations]
+
+    async def revoke_invitation(self, teacher_id: UUID, invitation_id: UUID) -> None:
+        if not self._invitations:
+            raise EntityNotFound("Invitations are not enabled")
+        invitation = await self._invitations.get_by_id(invitation_id)
+        if not invitation:
+            raise EntityNotFound("Invitation not found")
+        await self._owned_classroom(teacher_id, invitation.classroom_id)
+        invitation.status = "revoked"
+        await self._invitations.update(invitation)
+
+    async def my_invitations(self, user_id: UUID) -> list[InvitationResponse]:
+        if not self._invitations:
+            return []
+        user = await self._users.get_by_id(user_id)
+        if not user:
+            return []
+        invitations = await self._invitations.list_pending_for_email(user.email)
+        return [self._invitation_to_response(i) for i in invitations]
+
+    async def respond_to_invitation(
+        self, user_id: UUID, invitation_id: UUID, accept: bool
+    ) -> None:
+        if not self._invitations:
+            raise EntityNotFound("Invitations are not enabled")
+        invitation = await self._invitations.get_by_id(invitation_id)
+        user = await self._users.get_by_id(user_id)
+        if (
+            not invitation
+            or not user
+            or not invitation.is_pending
+            or invitation.email.lower() != user.email.lower()
+        ):
+            raise EntityNotFound("Invitation not found")
+
+        invitation.status = "accepted" if accept else "rejected"
+        await self._invitations.update(invitation)
+        if not accept:
+            return
+
+        if invitation.role == "co_teacher":
+            if self._teachers and not await self._teachers.get(invitation.classroom_id, user_id):
+                await self._teachers.add(
+                    ClassroomTeacher(
+                        classroom_id=invitation.classroom_id,
+                        teacher_id=user_id,
+                        role="co_teacher",
+                    )
+                )
+        else:
+            existing = await self._enrollments.get(invitation.classroom_id, user_id)
+            if existing:
+                await self._enrollments.set_status(invitation.classroom_id, user_id, "active")
+            else:
+                await self._enrollments.create(
+                    Enrollment(classroom_id=invitation.classroom_id, student_id=user_id)
+                )
+        if self._notify:
+            await self._notify.emit(
+                user_id=invitation.invited_by,
+                type="invitation_accepted",
+                title=f"{user.username} accepted your invitation",
+                data={"classroom_id": str(invitation.classroom_id)},
+            )
+
+    async def list_co_teachers(
+        self, teacher_id: UUID, classroom_id: UUID
+    ) -> list[CoTeacherResponse]:
+        if not self._teachers:
+            return []
+        await self._owned_classroom(teacher_id, classroom_id)
+        out: list[CoTeacherResponse] = []
+        for membership in await self._teachers.list_by_classroom(classroom_id):
+            user = await self._users.get_by_id(membership.teacher_id)
+            if user:
+                out.append(
+                    CoTeacherResponse(
+                        id=str(user.id),
+                        username=user.username,
+                        email=user.email,
+                        role=membership.role,
+                        added_at=membership.created_at.isoformat(),
+                    )
+                )
+        return out
+
+    async def remove_co_teacher(
+        self, teacher_id: UUID, classroom_id: UUID, co_teacher_id: UUID
+    ) -> None:
+        if not self._teachers:
+            raise EntityNotFound("Co-teaching is not enabled")
+        classroom = await self._classrooms.get_by_id(classroom_id)
+        if not classroom or classroom.is_deleted:
+            raise EntityNotFound("Classroom not found")
+        if classroom.teacher_id != teacher_id:
+            raise AuthorizationError("Only the classroom owner can remove teachers")
+        if co_teacher_id == classroom.teacher_id:
+            raise AuthorizationError("The owner cannot be removed")
+        await self._teachers.remove(classroom_id, co_teacher_id)
+
+    # ── Enrollment approval ──────────────────────────────────────────────────
+
+    async def list_pending_enrollments(
+        self, teacher_id: UUID, classroom_id: UUID
+    ) -> list[PendingEnrollmentResponse]:
+        await self._owned_classroom(teacher_id, classroom_id)
+        students = await self._enrollments.list_students(classroom_id, status="pending")
+        out: list[PendingEnrollmentResponse] = []
+        for user in students:
+            enrollment = await self._enrollments.get(classroom_id, user.id)
+            out.append(
+                PendingEnrollmentResponse(
+                    student_id=str(user.id),
+                    username=user.username,
+                    email=user.email,
+                    requested_at=enrollment.joined_at.isoformat() if enrollment else "",
+                )
+            )
+        return out
+
+    async def approve_enrollment(
+        self, teacher_id: UUID, classroom_id: UUID, student_id: UUID
+    ) -> None:
+        classroom = await self._owned_classroom(teacher_id, classroom_id)
+        enrollment = await self._enrollments.get(classroom_id, student_id)
+        if not enrollment or enrollment.status != "pending":
+            raise EntityNotFound("No pending join request for that student")
+        await self._enrollments.set_status(classroom_id, student_id, "active")
+        if self._notify:
+            await self._notify.emit(
+                user_id=student_id,
+                type="enrollment_approved",
+                title=f"You're in! {classroom.name} approved your request",
+                data={"classroom_id": str(classroom_id)},
+            )
+
+    async def reject_enrollment(
+        self, teacher_id: UUID, classroom_id: UUID, student_id: UUID
+    ) -> None:
+        classroom = await self._owned_classroom(teacher_id, classroom_id)
+        enrollment = await self._enrollments.get(classroom_id, student_id)
+        if not enrollment or enrollment.status != "pending":
+            raise EntityNotFound("No pending join request for that student")
+        await self._enrollments.delete(classroom_id, student_id)
+        if self._notify:
+            await self._notify.emit(
+                user_id=student_id,
+                type="enrollment_rejected",
+                title=f"Your request to join {classroom.name} was declined",
+                data={"classroom_id": str(classroom_id)},
+            )
+
+    async def leave_classroom(self, student_id: UUID, classroom_id: UUID) -> None:
+        enrollment = await self._enrollments.get(classroom_id, student_id)
+        if not enrollment:
+            raise EntityNotFound("You are not enrolled in this class")
+        await self._enrollments.delete(classroom_id, student_id)
+        logger.info(
+            "student_left", classroom_id=str(classroom_id), student_id=str(student_id)
+        )
 
     # ── Chapters ─────────────────────────────────────────────────────────────
 
@@ -197,16 +456,43 @@ class ClassroomService:
 
     async def join_by_code(self, student_id: UUID, join_code: str) -> StudentClassroomResponse:
         classroom = await self._classrooms.get_by_join_code(join_code.strip().upper())
-        if not classroom or classroom.is_archived:
+        if (
+            not classroom
+            or classroom.is_archived
+            or classroom.is_deleted
+            or not classroom.join_code_enabled
+        ):
             raise EntityNotFound("No class found for that code")
 
-        if not await self._enrollments.is_enrolled(classroom.id, student_id):
+        existing = await self._enrollments.get(classroom.id, student_id)
+        if existing and existing.status == "pending":
+            raise DuplicateEntity("Your join request is awaiting teacher approval")
+        if not existing:
+            requires_approval = bool(classroom.settings.get("require_approval"))
+            status = "pending" if requires_approval else "active"
             await self._enrollments.create(
-                Enrollment(classroom_id=classroom.id, student_id=student_id)
+                Enrollment(classroom_id=classroom.id, student_id=student_id, status=status)
             )
+            student = await self._users.get_by_id(student_id)
+            if self._notify and student:
+                await self._notify.emit(
+                    user_id=classroom.teacher_id,
+                    type="student_join_request" if requires_approval else "student_joined",
+                    title=(
+                        f"{student.username} requested to join {classroom.name}"
+                        if requires_approval
+                        else f"{student.username} joined {classroom.name}"
+                    ),
+                    data={"classroom_id": str(classroom.id), "student_id": str(student_id)},
+                )
             logger.info(
-                "student_enrolled", classroom_id=str(classroom.id), student_id=str(student_id)
+                "student_enrolled",
+                classroom_id=str(classroom.id),
+                student_id=str(student_id),
+                status=status,
             )
+        elif existing.status == "removed":
+            await self._enrollments.set_status(classroom.id, student_id, "active")
         return await self._student_classroom_response(classroom)
 
     async def list_student_classrooms(self, student_id: UUID) -> list[StudentClassroomResponse]:
@@ -276,12 +562,15 @@ class ClassroomService:
         return generate_join_code()
 
     async def _owned_classroom(self, teacher_id: UUID, classroom_id: UUID) -> Classroom:
+        """The classroom, if the caller teaches it (owner or co-teacher)."""
         classroom = await self._classrooms.get_by_id(classroom_id)
-        if not classroom:
+        if not classroom or classroom.is_deleted:
             raise EntityNotFound("Classroom not found")
-        if classroom.teacher_id != teacher_id:
-            raise AuthorizationError("You do not own this classroom")
-        return classroom
+        if classroom.teacher_id == teacher_id:
+            return classroom
+        if self._teachers and await self._teachers.get(classroom_id, teacher_id):
+            return classroom
+        raise AuthorizationError("You do not teach this classroom")
 
     async def _owned_chapter(self, teacher_id: UUID, chapter_id: UUID) -> Chapter:
         chapter = await self._chapters.get_by_id(chapter_id)
@@ -329,10 +618,27 @@ class ClassroomService:
             color=c.color,
             join_code=c.join_code,
             is_archived=c.is_archived,
+            semester=c.semester,
+            institution_id=str(c.institution_id) if c.institution_id else None,
+            banner_url=c.banner_url,
+            settings=c.settings,
+            join_code_enabled=c.join_code_enabled,
             student_count=student_count,
             chapter_count=chapter_count,
             created_at=c.created_at.isoformat(),
             updated_at=c.updated_at.isoformat(),
+        )
+
+    @staticmethod
+    def _invitation_to_response(i: ClassroomInvitation) -> InvitationResponse:
+        return InvitationResponse(
+            id=str(i.id),
+            classroom_id=str(i.classroom_id),
+            email=i.email,
+            role=i.role,
+            status=i.status,
+            invited_by=str(i.invited_by),
+            created_at=i.created_at.isoformat(),
         )
 
     @staticmethod

@@ -1,5 +1,5 @@
-import { state, setAccent, navigate, registerRoute } from '../state.js';
-import { shade } from '../utils.js';
+import { state, setAccent, navigate, registerRoute } from '../state.js?v=2';
+import { shade } from '../utils.js?v=2';
 
 export function renderSubject(sid) {
   const s = state.data.subjects.find(x => x.id === sid);

@@ -2,21 +2,26 @@
 FastAPI dependency providers — single source of truth for service construction.
 All services are assembled here. Routes receive fully-constructed services.
 """
+import hmac
 from typing import Annotated
 
 import structlog
-from fastapi import Depends, HTTPException, status
+from fastapi import Depends, Header, HTTPException, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
 from src.application.dtos.user import UserResponse
+from src.application.services.admin_service import AdminService
 from src.application.services.answer_evaluator import AnswerEvaluator
 from src.application.services.auth_service import AuthService
+from src.application.services.bridge_ingestion_service import BridgeIngestionService
 from src.application.services.chat_service import ChatService
 from src.application.services.classroom_service import ClassroomService
 from src.application.services.concept_extraction_service import ConceptExtractionService
 from src.application.services.concept_memory_service import ConceptMemoryService
 from src.application.services.confidence_updater import ConfidenceUpdater
 from src.application.services.context_validation_service import ContextValidationService
+from src.application.services.coursework_service import CourseworkService
+from src.application.services.discussion_service import DiscussionService
 from src.application.services.document_service import DocumentService
 from src.application.services.evidence_collector import EvidenceCollector
 from src.application.services.intent_engine import IntentEngine
@@ -31,7 +36,9 @@ from src.application.services.learning_orchestrator import LearningOrchestrator
 from src.application.services.learning_path_service import LearningPathService
 from src.application.services.learning_velocity_service import LearningVelocityService
 from src.application.services.mastery_engine import MasteryEngine
+from src.application.services.material_service import MaterialService
 from src.application.services.next_best_topic_engine import NextBestTopicEngine
+from src.application.services.notification_service import NotificationService
 from src.application.services.preference_inference_engine import PreferenceInferenceEngine
 from src.application.services.prompt_assembly_service import PromptAssemblyService
 from src.application.services.question_generator import QuestionGenerator
@@ -44,7 +51,10 @@ from src.application.services.retrieval_service import RetrievalService
 from src.application.services.search_service import SearchService
 from src.application.services.session_memory_service import SessionMemoryService
 from src.application.services.skill_graph_service import SkillGraphService
+from src.application.services.student_dashboard_service import StudentDashboardService
 from src.application.services.student_profile_service import StudentProfileService
+from src.application.services.submission_service import SubmissionService
+from src.application.services.teacher_analytics_service import TeacherAnalyticsService
 from src.application.services.user_service import UserService
 from src.application.services.vector_service import VectorService
 from src.application.services.vision_ocr_service import VisionOCRService
@@ -75,6 +85,23 @@ from src.infrastructure.database.repositories.learning_repository import (
     MasteryRepository,
     StudentProfileRepository,
 )
+from src.infrastructure.database.repositories.lms_repository import (
+    AuditLogRepository,
+    AuthTokenRepository,
+    BookmarkRepository,
+    ClassroomTeacherRepository,
+    CommentRepository,
+    CourseworkRepository,
+    FolderRepository,
+    InstitutionRepository,
+    InvitationRepository,
+    LmsAnalyticsRepository,
+    MaterialRepository,
+    MaterialViewRepository,
+    NotificationRepository,
+    SessionRepository,
+    SubmissionRepository,
+)
 from src.infrastructure.database.repositories.profile_repository import (
     ProfileRepository,
     SettingsRepository,
@@ -87,10 +114,11 @@ from src.infrastructure.database.repositories.question_repository import (
 )
 from src.infrastructure.database.repositories.user_repository import UserRepository
 from src.infrastructure.database.session import AsyncSession, get_db
+from src.infrastructure.email.factory import get_email_provider
 from src.infrastructure.embeddings.factory import get_embedding_provider
 from src.infrastructure.llm.factory import get_llm_provider
 from src.infrastructure.llm.prompt_loader import PromptLoader
-from src.infrastructure.storage.local_storage import LocalFileStorage
+from src.infrastructure.storage.factory import get_file_storage
 from src.infrastructure.vector.factory import get_vector_store
 from src.infrastructure.vision.factory import get_vision_provider
 
@@ -109,6 +137,9 @@ def get_auth_service(
         profile_repo=ProfileRepository(db),
         settings_repo=SettingsRepository(db),
         app_settings=settings,
+        auth_token_repo=AuthTokenRepository(db),
+        session_repo=SessionRepository(db),
+        email_provider=get_email_provider(),
     )
 
 
@@ -154,6 +185,28 @@ async def require_teacher(
             detail={"code": "FORBIDDEN", "message": "Teacher access required"},
         )
     return current_user
+
+
+def require_bridge_token(
+    settings: Annotated[Settings, Depends(get_settings)],
+    x_bridge_token: Annotated[str | None, Header()] = None,
+) -> None:
+    """Guards the evidence-ingest bridge with a shared service token.
+
+    Disabled (404) unless BRIDGE_INGEST_TOKEN is configured; 401 on mismatch.
+    Kept as a dependency so the route body carries no auth logic.
+    """
+    token = settings.bridge_ingest_token
+    if not token:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail={"code": "BRIDGE_DISABLED", "message": "Evidence bridge is not enabled"},
+        )
+    if not x_bridge_token or not hmac.compare_digest(x_bridge_token, token):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail={"code": "BRIDGE_UNAUTHORIZED", "message": "Invalid bridge token"},
+        )
 
 
 # ── User / Chat ───────────────────────────────────────────────────────────────
@@ -245,7 +298,7 @@ def get_document_service(
         doc_repo=DocumentRepository(db),
         chunk_repo=ChunkRepository(db),
         job_repo=IngestionJobRepository(db),
-        storage=LocalFileStorage(settings.storage_local_path),
+        storage=get_file_storage(settings),
         vector_svc=vector_svc,
         settings=settings,
     )
@@ -278,6 +331,112 @@ def get_classroom_service(
         kb_repo=KnowledgeBaseRepository(db),
         user_repo=UserRepository(db),
         doc_repo=DocumentRepository(db),
+        teacher_repo=ClassroomTeacherRepository(db),
+        invitation_repo=InvitationRepository(db),
+        notification_svc=NotificationService(NotificationRepository(db)),
+    )
+
+
+# ── LMS (Google Classroom parity) ────────────────────────────────────────────
+
+def get_notification_service(
+    db: Annotated[AsyncSession, Depends(get_db)],
+) -> NotificationService:
+    return NotificationService(NotificationRepository(db))
+
+
+def get_material_service(
+    db: Annotated[AsyncSession, Depends(get_db)],
+    settings: Annotated[Settings, Depends(get_settings)],
+) -> MaterialService:
+    return MaterialService(
+        material_repo=MaterialRepository(db),
+        folder_repo=FolderRepository(db),
+        classroom_repo=ClassroomRepository(db),
+        enrollment_repo=EnrollmentRepository(db),
+        teacher_repo=ClassroomTeacherRepository(db),
+        bookmark_repo=BookmarkRepository(db),
+        view_repo=MaterialViewRepository(db),
+        storage=get_file_storage(settings),
+        notification_svc=NotificationService(NotificationRepository(db)),
+    )
+
+
+def get_coursework_service(
+    db: Annotated[AsyncSession, Depends(get_db)],
+) -> CourseworkService:
+    return CourseworkService(
+        coursework_repo=CourseworkRepository(db),
+        classroom_repo=ClassroomRepository(db),
+        enrollment_repo=EnrollmentRepository(db),
+        teacher_repo=ClassroomTeacherRepository(db),
+        submission_repo=SubmissionRepository(db),
+        notification_svc=NotificationService(NotificationRepository(db)),
+    )
+
+
+def get_submission_service(
+    db: Annotated[AsyncSession, Depends(get_db)],
+    settings: Annotated[Settings, Depends(get_settings)],
+) -> SubmissionService:
+    return SubmissionService(
+        submission_repo=SubmissionRepository(db),
+        coursework_repo=CourseworkRepository(db),
+        classroom_repo=ClassroomRepository(db),
+        enrollment_repo=EnrollmentRepository(db),
+        teacher_repo=ClassroomTeacherRepository(db),
+        user_repo=UserRepository(db),
+        storage=get_file_storage(settings),
+        notification_svc=NotificationService(NotificationRepository(db)),
+    )
+
+
+def get_discussion_service(
+    db: Annotated[AsyncSession, Depends(get_db)],
+) -> DiscussionService:
+    return DiscussionService(
+        comment_repo=CommentRepository(db),
+        classroom_repo=ClassroomRepository(db),
+        enrollment_repo=EnrollmentRepository(db),
+        teacher_repo=ClassroomTeacherRepository(db),
+        user_repo=UserRepository(db),
+        notification_svc=NotificationService(NotificationRepository(db)),
+    )
+
+
+def get_teacher_analytics_service(
+    db: Annotated[AsyncSession, Depends(get_db)],
+) -> TeacherAnalyticsService:
+    return TeacherAnalyticsService(
+        analytics_repo=LmsAnalyticsRepository(db),
+        classroom_repo=ClassroomRepository(db),
+        enrollment_repo=EnrollmentRepository(db),
+        teacher_repo=ClassroomTeacherRepository(db),
+    )
+
+
+def get_student_dashboard_service(
+    db: Annotated[AsyncSession, Depends(get_db)],
+) -> StudentDashboardService:
+    return StudentDashboardService(
+        enrollment_repo=EnrollmentRepository(db),
+        coursework_repo=CourseworkRepository(db),
+        submission_repo=SubmissionRepository(db),
+        bookmark_repo=BookmarkRepository(db),
+        view_repo=MaterialViewRepository(db),
+        material_repo=MaterialRepository(db),
+    )
+
+
+def get_admin_service(
+    db: Annotated[AsyncSession, Depends(get_db)],
+) -> AdminService:
+    return AdminService(
+        institution_repo=InstitutionRepository(db),
+        user_repo=UserRepository(db),
+        classroom_repo=ClassroomRepository(db),
+        audit_repo=AuditLogRepository(db),
+        analytics_repo=LmsAnalyticsRepository(db),
     )
 
 
@@ -507,6 +666,17 @@ def get_confidence_updater(
         mastery_repo=MasteryRepository(db),
         concept_repo=ConceptNodeRepository(db),
         gap_repo=LearningGapRepository(db),
+    )
+
+
+def get_bridge_ingestion_service(
+    db: Annotated[AsyncSession, Depends(get_db)],
+    confidence_updater: Annotated[ConfidenceUpdater, Depends(get_confidence_updater)],
+) -> BridgeIngestionService:
+    return BridgeIngestionService(
+        user_repo=UserRepository(db),
+        concept_repo=ConceptNodeRepository(db),
+        confidence_updater=confidence_updater,
     )
 
 

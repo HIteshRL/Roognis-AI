@@ -6,6 +6,7 @@ AgenticRagService flow (safety -> subject -> retrieve -> concept-grounding ->
 answer) with DB-backed retrieval (seed + uploaded-PDF chunks) and conversation
 logging so the teacher can review what students ask.
 """
+import os
 import sys
 from pathlib import Path
 
@@ -26,6 +27,7 @@ from providers import (  # noqa: E402
     CorpusGuardrail,
     DbRetrieval,
     OfflineTutorProvider,
+    is_generic_followup,
     sentences,
     tokens,
 )
@@ -33,9 +35,12 @@ from providers import (  # noqa: E402
 _SUBJECT_FLOOR = 0.34
 _CHAPTER_FLOOR = 0.25
 
-# ── Boot: schema + seed ───────────────────────────────────────────────────────
+# ── Boot: schema + (optional) demo seed ──────────────────────────────────────
+# The teacher builds real classes and uploads real material, so the demo subject
+# classrooms are NOT seeded by default. Set ROOGNIS_SEED_DEMO=1 to restore them.
 db.init_db()
-db.seed_from_curriculum(curriculum.SUBJECTS, sentences)
+if os.getenv("ROOGNIS_SEED_DEMO") == "1":
+    db.seed_from_curriculum(curriculum.SUBJECTS, sentences)
 
 _settings = get_settings()
 ONLINE = bool(_settings.groq_api_key)
@@ -80,8 +85,16 @@ async def ask(question: str, classroom_id: str, chapter_id: str,
               student_id: str, conversation_id: str | None) -> dict:
     room = store.get_classroom(classroom_id)
     chapter = store.get_chapter(chapter_id)
+
+    # A conversational follow-up ("how does it work?") carries no keywords, so it
+    # would retrieve nothing and be wrongly refused. Anchor it to the current
+    # chapter so it retrieves the right content and answers in context.
+    ask_question = question
+    if chapter and is_generic_followup(question):
+        ask_question = f"{chapter['title']}: {question}"
+
     res = await _agentic.ask(
-        question,
+        ask_question,
         subject=room["name"] if room else None,
         chapter=chapter["title"] if chapter else None,
         knowledge_base_id=chapter_id,

@@ -50,28 +50,31 @@
   display: flex;
   align-items: center;
   gap: 14px;
-  background: var(--card);
-  border: 1px solid var(--line);
+  background: var(--glass-bg);
+  backdrop-filter: saturate(1.5) blur(var(--glass-blur));
+  -webkit-backdrop-filter: saturate(1.5) blur(var(--glass-blur));
+  border: 1px solid var(--glass-border);
   border-radius: 16px;
   padding: 16px 18px;
   box-shadow: var(--shadow);
   cursor: pointer;
-  transition: box-shadow .16s, transform .16s;
+  transition: box-shadow .16s, transform .16s, border-color .16s;
 }
 .chapter:hover {
-  box-shadow: 0 10px 26px rgba(20,26,46,.10);
+  box-shadow: var(--shadow-lg);
   transform: translateY(-2px);
+  border-color: color-mix(in srgb, var(--accent) 38%, var(--glass-border));
 }
 .num {
   width: 38px;
   height: 38px;
-  border-radius: 11px;
+  border-radius: 12px;
   display: flex;
   align-items: center;
   justify-content: center;
   font-weight: 800;
   color: var(--accent);
-  background: color-mix(in srgb, var(--accent) 12%, #fff);
+  background: color-mix(in srgb, var(--accent) 16%, transparent);
   flex-shrink: 0;
 }
 .chapter h4 { margin: 0; font-size: 15.5px; }

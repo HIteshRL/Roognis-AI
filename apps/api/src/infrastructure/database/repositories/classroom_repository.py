@@ -32,6 +32,13 @@ def _classroom_to_entity(m: ClassroomModel) -> Classroom:
     c.color = m.color
     c.join_code = m.join_code
     c.is_archived = m.is_archived
+    c.semester = m.semester
+    c.institution_id = UUID(m.institution_id) if m.institution_id else None
+    c.banner_url = m.banner_url
+    c.settings = m.settings or {}
+    c.join_code_enabled = m.join_code_enabled
+    c.is_deleted = m.is_deleted
+    c.deleted_at = m.deleted_at
     c.created_at = m.created_at
     c.updated_at = m.updated_at
     return c
@@ -80,6 +87,13 @@ class ClassroomRepository(AbstractClassroomRepository):
             color=classroom.color,
             join_code=classroom.join_code,
             is_archived=classroom.is_archived,
+            semester=classroom.semester,
+            institution_id=str(classroom.institution_id) if classroom.institution_id else None,
+            banner_url=classroom.banner_url,
+            settings=classroom.settings,
+            join_code_enabled=classroom.join_code_enabled,
+            is_deleted=classroom.is_deleted,
+            deleted_at=classroom.deleted_at,
         )
         self._db.add(model)
         await self._db.flush()
@@ -124,6 +138,15 @@ class ClassroomRepository(AbstractClassroomRepository):
         model.color = classroom.color
         model.join_code = classroom.join_code
         model.is_archived = classroom.is_archived
+        model.semester = classroom.semester
+        model.institution_id = (
+            str(classroom.institution_id) if classroom.institution_id else None
+        )
+        model.banner_url = classroom.banner_url
+        model.settings = classroom.settings
+        model.join_code_enabled = classroom.join_code_enabled
+        model.is_deleted = classroom.is_deleted
+        model.deleted_at = classroom.deleted_at
         await self._db.flush()
         await self._db.refresh(model)
         return _classroom_to_entity(model)
@@ -137,11 +160,37 @@ class ClassroomRepository(AbstractClassroomRepository):
             await self._db.delete(model)
             await self._db.flush()
 
+    async def list_all(
+        self,
+        page: int = 1,
+        limit: int = 50,
+        search: str | None = None,
+        include_deleted: bool = False,
+    ) -> tuple[list[Classroom], int]:
+        stmt = select(ClassroomModel)
+        if search:
+            stmt = stmt.where(ClassroomModel.name.ilike(f"%{search}%"))
+        if not include_deleted:
+            stmt = stmt.where(ClassroomModel.is_deleted.is_(False))
+        total = (
+            await self._db.execute(select(func.count()).select_from(stmt.subquery()))
+        ).scalar_one()
+        stmt = (
+            stmt.order_by(ClassroomModel.created_at.desc())
+            .offset((page - 1) * limit)
+            .limit(limit)
+        )
+        rows = (await self._db.execute(stmt)).scalars().all()
+        return [_classroom_to_entity(m) for m in rows], int(total)
+
     async def count_students(self, classroom_id: UUID) -> int:
         result = await self._db.execute(
             select(func.count())
             .select_from(EnrollmentModel)
-            .where(EnrollmentModel.classroom_id == str(classroom_id))
+            .where(
+                EnrollmentModel.classroom_id == str(classroom_id),
+                EnrollmentModel.status == "active",
+            )
         )
         return int(result.scalar_one())
 
@@ -248,11 +297,14 @@ class EnrollmentRepository(AbstractEnrollmentRepository):
         model = result.scalar_one_or_none()
         return _enrollment_to_entity(model) if model else None
 
-    async def list_students(self, classroom_id: UUID) -> list[User]:
+    async def list_students(self, classroom_id: UUID, status: str = "active") -> list[User]:
         result = await self._db.execute(
             select(UserModel)
             .join(EnrollmentModel, EnrollmentModel.student_id == UserModel.id)
-            .where(EnrollmentModel.classroom_id == str(classroom_id))
+            .where(
+                EnrollmentModel.classroom_id == str(classroom_id),
+                EnrollmentModel.status == status,
+            )
             .order_by(EnrollmentModel.joined_at.asc())
         )
         return [_user_to_entity(m) for m in result.scalars().all()]
@@ -263,7 +315,9 @@ class EnrollmentRepository(AbstractEnrollmentRepository):
             .join(EnrollmentModel, EnrollmentModel.classroom_id == ClassroomModel.id)
             .where(
                 EnrollmentModel.student_id == str(student_id),
+                EnrollmentModel.status == "active",
                 ClassroomModel.is_archived.is_(False),
+                ClassroomModel.is_deleted.is_(False),
             )
             .order_by(EnrollmentModel.joined_at.desc())
         )
@@ -276,9 +330,22 @@ class EnrollmentRepository(AbstractEnrollmentRepository):
             .where(
                 EnrollmentModel.classroom_id == str(classroom_id),
                 EnrollmentModel.student_id == str(student_id),
+                EnrollmentModel.status == "active",
             )
         )
         return int(result.scalar_one()) > 0
+
+    async def set_status(self, classroom_id: UUID, student_id: UUID, status: str) -> None:
+        result = await self._db.execute(
+            select(EnrollmentModel).where(
+                EnrollmentModel.classroom_id == str(classroom_id),
+                EnrollmentModel.student_id == str(student_id),
+            )
+        )
+        model = result.scalar_one_or_none()
+        if model:
+            model.status = status
+            await self._db.flush()
 
     async def delete(self, classroom_id: UUID, student_id: UUID) -> None:
         result = await self._db.execute(

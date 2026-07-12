@@ -25,3 +25,25 @@ class TokenPayload(BaseModel):
     sub: str  # user_id
     email: str
     exp: int
+
+
+class RefreshRequest(BaseModel):
+    refresh_token: str = Field(min_length=16)
+
+
+class PasswordResetRequest(BaseModel):
+    email: EmailStr
+
+
+class PasswordResetConfirm(BaseModel):
+    token: str = Field(min_length=16)
+    new_password: str = Field(min_length=8, max_length=128)
+
+
+class EmailVerifyConfirm(BaseModel):
+    token: str = Field(min_length=16)
+
+
+class ChangePasswordRequest(BaseModel):
+    current_password: str = Field(min_length=1)
+    new_password: str = Field(min_length=8, max_length=128)

@@ -1,4 +1,6 @@
-from pydantic import BaseModel, Field
+from typing import Literal
+
+from pydantic import BaseModel, EmailStr, Field
 
 # ── Classroom (teacher's subject) ────────────────────────────────────────────
 
@@ -10,6 +12,10 @@ class CreateClassroomRequest(BaseModel):
     grade: str | None = Field(default=None, max_length=20)
     description: str | None = Field(default=None, max_length=2000)
     color: str | None = Field(default=None, max_length=20)
+    semester: str | None = Field(default=None, max_length=50)
+    institution_id: str | None = None
+    banner_url: str | None = Field(default=None, max_length=2000)
+    settings: dict | None = None
 
 
 class UpdateClassroomRequest(BaseModel):
@@ -20,6 +26,10 @@ class UpdateClassroomRequest(BaseModel):
     grade: str | None = Field(default=None, max_length=20)
     description: str | None = Field(default=None, max_length=2000)
     color: str | None = Field(default=None, max_length=20)
+    semester: str | None = Field(default=None, max_length=50)
+    institution_id: str | None = None
+    banner_url: str | None = Field(default=None, max_length=2000)
+    settings: dict | None = None
 
 
 class ClassroomResponse(BaseModel):
@@ -34,10 +44,47 @@ class ClassroomResponse(BaseModel):
     color: str
     join_code: str
     is_archived: bool
+    semester: str | None = None
+    institution_id: str | None = None
+    banner_url: str | None = None
+    settings: dict = {}
+    join_code_enabled: bool = True
     student_count: int = 0
     chapter_count: int = 0
     created_at: str
     updated_at: str
+
+
+# ── Co-teachers & invitations ────────────────────────────────────────────────
+
+class InviteRequest(BaseModel):
+    email: EmailStr
+    role: Literal["student", "co_teacher"] = "student"
+
+
+class InvitationResponse(BaseModel):
+    id: str
+    classroom_id: str
+    email: str
+    role: str
+    status: str
+    invited_by: str
+    created_at: str
+
+
+class CoTeacherResponse(BaseModel):
+    id: str
+    username: str
+    email: str
+    role: str
+    added_at: str
+
+
+class PendingEnrollmentResponse(BaseModel):
+    student_id: str
+    username: str
+    email: str
+    requested_at: str
 
 
 # ── Chapter ──────────────────────────────────────────────────────────────────

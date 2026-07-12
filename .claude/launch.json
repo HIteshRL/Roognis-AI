@@ -31,13 +31,6 @@
     },
     {
       "name": "Student UI Simulation",
-      "runtimeExecutable": "python",
-      "runtimeArgs": ["-m", "http.server", "4174"],
-      "port": 4174,
-      "cwd": ".preview/student-sim"
-    },
-    {
-      "name": "Student Portal",
       "runtimeExecutable": "py",
       "runtimeArgs": ["-3.12", "-m", "uvicorn", "app:app", "--port", "5050"],
       "port": 5050,

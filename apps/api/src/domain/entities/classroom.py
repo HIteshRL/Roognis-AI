@@ -48,6 +48,13 @@ class Classroom:
     color: str = CLASSROOM_COLORS[0]
     join_code: str = field(default_factory=generate_join_code)
     is_archived: bool = False
+    semester: str | None = None
+    institution_id: UUID | None = None
+    banner_url: str | None = None
+    settings: dict = field(default_factory=dict)
+    join_code_enabled: bool = True
+    is_deleted: bool = False
+    deleted_at: datetime | None = None
     created_at: datetime = field(default_factory=lambda: datetime.now(UTC))
     updated_at: datetime = field(default_factory=lambda: datetime.now(UTC))
 
@@ -57,6 +64,11 @@ class Classroom:
 
     def rotate_code(self) -> None:
         self.join_code = generate_join_code()
+        self.updated_at = datetime.now(UTC)
+
+    def soft_delete(self) -> None:
+        self.is_deleted = True
+        self.deleted_at = datetime.now(UTC)
         self.updated_at = datetime.now(UTC)
 
 

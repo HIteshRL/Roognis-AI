@@ -14,6 +14,7 @@ from fastapi import APIRouter, BackgroundTasks, Depends, File, Form, Request, Up
 from src.application.dtos.classroom import (
     CreateChapterRequest,
     CreateClassroomRequest,
+    InviteRequest,
     UpdateChapterRequest,
     UpdateClassroomRequest,
 )
@@ -115,6 +116,136 @@ async def regenerate_code(
 ):
     result = await svc.regenerate_join_code(UUID(teacher.id), classroom_id)
     return ok(result.model_dump(), message="Join code regenerated", request_id=request.state.request_id)
+
+
+@router.delete("/classrooms/{classroom_id}")
+async def delete_classroom(
+    classroom_id: UUID,
+    request: Request,
+    teacher: Annotated[UserResponse, Depends(require_teacher)],
+    svc: Annotated[ClassroomService, Depends(get_classroom_service)],
+):
+    await svc.delete_classroom(UUID(teacher.id), classroom_id)
+    return ok({}, message="Classroom deleted", request_id=request.state.request_id)
+
+
+@router.post("/classrooms/{classroom_id}/join-code/enable")
+async def enable_join_code(
+    classroom_id: UUID,
+    request: Request,
+    teacher: Annotated[UserResponse, Depends(require_teacher)],
+    svc: Annotated[ClassroomService, Depends(get_classroom_service)],
+):
+    result = await svc.set_join_code_enabled(UUID(teacher.id), classroom_id, True)
+    return ok(result.model_dump(), message="Join code enabled", request_id=request.state.request_id)
+
+
+@router.post("/classrooms/{classroom_id}/join-code/disable")
+async def disable_join_code(
+    classroom_id: UUID,
+    request: Request,
+    teacher: Annotated[UserResponse, Depends(require_teacher)],
+    svc: Annotated[ClassroomService, Depends(get_classroom_service)],
+):
+    result = await svc.set_join_code_enabled(UUID(teacher.id), classroom_id, False)
+    return ok(result.model_dump(), message="Join code disabled", request_id=request.state.request_id)
+
+
+# ── Invitations & co-teachers ────────────────────────────────────────────────
+
+@router.post("/classrooms/{classroom_id}/invitations", status_code=201)
+async def invite_member(
+    classroom_id: UUID,
+    body: InviteRequest,
+    request: Request,
+    teacher: Annotated[UserResponse, Depends(require_teacher)],
+    svc: Annotated[ClassroomService, Depends(get_classroom_service)],
+):
+    result = await svc.invite(UUID(teacher.id), classroom_id, body.email, body.role)
+    return ok(result.model_dump(), message="Invitation sent", request_id=request.state.request_id, status_code=201)
+
+
+@router.get("/classrooms/{classroom_id}/invitations")
+async def list_invitations(
+    classroom_id: UUID,
+    request: Request,
+    teacher: Annotated[UserResponse, Depends(require_teacher)],
+    svc: Annotated[ClassroomService, Depends(get_classroom_service)],
+    status: str | None = None,
+):
+    result = await svc.list_invitations(UUID(teacher.id), classroom_id, status=status)
+    return ok([r.model_dump() for r in result], request_id=request.state.request_id)
+
+
+@router.delete("/invitations/{invitation_id}")
+async def revoke_invitation(
+    invitation_id: UUID,
+    request: Request,
+    teacher: Annotated[UserResponse, Depends(require_teacher)],
+    svc: Annotated[ClassroomService, Depends(get_classroom_service)],
+):
+    await svc.revoke_invitation(UUID(teacher.id), invitation_id)
+    return ok({}, message="Invitation revoked", request_id=request.state.request_id)
+
+
+@router.get("/classrooms/{classroom_id}/co-teachers")
+async def list_co_teachers(
+    classroom_id: UUID,
+    request: Request,
+    teacher: Annotated[UserResponse, Depends(require_teacher)],
+    svc: Annotated[ClassroomService, Depends(get_classroom_service)],
+):
+    result = await svc.list_co_teachers(UUID(teacher.id), classroom_id)
+    return ok([r.model_dump() for r in result], request_id=request.state.request_id)
+
+
+@router.delete("/classrooms/{classroom_id}/co-teachers/{co_teacher_id}")
+async def remove_co_teacher(
+    classroom_id: UUID,
+    co_teacher_id: UUID,
+    request: Request,
+    teacher: Annotated[UserResponse, Depends(require_teacher)],
+    svc: Annotated[ClassroomService, Depends(get_classroom_service)],
+):
+    await svc.remove_co_teacher(UUID(teacher.id), classroom_id, co_teacher_id)
+    return ok({}, message="Co-teacher removed", request_id=request.state.request_id)
+
+
+# ── Join requests (approval flow) ────────────────────────────────────────────
+
+@router.get("/classrooms/{classroom_id}/join-requests")
+async def list_join_requests(
+    classroom_id: UUID,
+    request: Request,
+    teacher: Annotated[UserResponse, Depends(require_teacher)],
+    svc: Annotated[ClassroomService, Depends(get_classroom_service)],
+):
+    result = await svc.list_pending_enrollments(UUID(teacher.id), classroom_id)
+    return ok([r.model_dump() for r in result], request_id=request.state.request_id)
+
+
+@router.post("/classrooms/{classroom_id}/join-requests/{student_id}/approve")
+async def approve_join_request(
+    classroom_id: UUID,
+    student_id: UUID,
+    request: Request,
+    teacher: Annotated[UserResponse, Depends(require_teacher)],
+    svc: Annotated[ClassroomService, Depends(get_classroom_service)],
+):
+    await svc.approve_enrollment(UUID(teacher.id), classroom_id, student_id)
+    return ok({}, message="Request approved", request_id=request.state.request_id)
+
+
+@router.post("/classrooms/{classroom_id}/join-requests/{student_id}/reject")
+async def reject_join_request(
+    classroom_id: UUID,
+    student_id: UUID,
+    request: Request,
+    teacher: Annotated[UserResponse, Depends(require_teacher)],
+    svc: Annotated[ClassroomService, Depends(get_classroom_service)],
+):
+    await svc.reject_enrollment(UUID(teacher.id), classroom_id, student_id)
+    return ok({}, message="Request rejected", request_id=request.state.request_id)
 
 
 # ── Students ─────────────────────────────────────────────────────────────────

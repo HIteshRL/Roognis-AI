@@ -1,4 +1,4 @@
-import { shade } from './utils.js';
+import { shade } from './utils.js?v=2';
 
 /** Shared mutable application state. */
 export const state = {

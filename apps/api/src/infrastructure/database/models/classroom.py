@@ -1,7 +1,7 @@
 from datetime import datetime
 
 from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, String, Text, UniqueConstraint, func
-from sqlalchemy.dialects.postgresql import UUID
+from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
 from src.infrastructure.database.base import Base, TimestampMixin, UUIDMixin
@@ -22,6 +22,15 @@ class ClassroomModel(Base, UUIDMixin, TimestampMixin):
     color: Mapped[str] = mapped_column(String(20), default="#1967d2", nullable=False)
     join_code: Mapped[str] = mapped_column(String(12), unique=True, nullable=False, index=True)
     is_archived: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    semester: Mapped[str | None] = mapped_column(String(50), nullable=True)
+    institution_id: Mapped[str | None] = mapped_column(
+        UUID(as_uuid=False), ForeignKey("institutions.id", ondelete="SET NULL"), nullable=True
+    )
+    banner_url: Mapped[str | None] = mapped_column(Text, nullable=True)
+    settings: Mapped[dict] = mapped_column(JSONB, default=dict, nullable=False)
+    join_code_enabled: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+    is_deleted: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    deleted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
 
 class ChapterModel(Base, UUIDMixin, TimestampMixin):

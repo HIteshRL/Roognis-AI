@@ -14,9 +14,21 @@ export async function initStudent(name) {
   return post('/api/student/init', { name });
 }
 
-/** GET /api/curriculum — full subject → chapter tree. */
-export async function getCurriculum() {
-  const r = await fetch(BASE + '/api/curriculum');
+/** GET /api/curriculum — the classes this student is enrolled in (roster model).
+ *  Without studentId it returns every class (teacher view). */
+export async function getCurriculum(studentId) {
+  const r = await fetch(BASE + '/api/curriculum' + (studentId ? `?student_id=${studentId}` : ''));
+  return r.json();
+}
+
+/** POST /api/student/join — join a class with its code (straight in, GC-style). */
+export async function joinClass(studentId, code) {
+  const r = await fetch(BASE + '/api/student/join', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ student_id: studentId, join_code: code }),
+  });
+  if (!r.ok) throw new Error((await r.json()).detail || 'No class found for that code');
   return r.json();
 }
 
@@ -44,4 +56,22 @@ export async function nextQuestion(payload) {
  */
 export async function answerQuestion(payload) {
   return post('/api/question/answer', payload);
+}
+
+/**
+ * GET /api/student/{id}/insights — learner-intelligence dashboard payload
+ * (mastery, gaps, skills, recommendations, timeline, analytics).
+ */
+export async function getInsights(studentId) {
+  const r = await fetch(`${BASE}/api/student/${studentId}/insights`);
+  return r.json();
+}
+
+/**
+ * POST /api/image/generate — text-to-image for the Image Studio.
+ * Always resolves to { ok: true, data_url } or { ok: false, error }.
+ * @param {string} prompt
+ */
+export async function generateImage(prompt) {
+  return post('/api/image/generate', { prompt });
 }

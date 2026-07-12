@@ -1,6 +1,6 @@
 from uuid import UUID
 
-from sqlalchemy import select
+from sqlalchemy import func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.domain.entities.user import User
@@ -94,3 +94,27 @@ class UserRepository(AbstractUserRepository):
         if model:
             await self._db.delete(model)
             await self._db.flush()
+
+    async def list(
+        self,
+        page: int = 1,
+        limit: int = 50,
+        role: str | None = None,
+        search: str | None = None,
+    ) -> tuple[list[User], int]:
+        stmt = select(UserModel)
+        if role:
+            stmt = stmt.where(UserModel.role == role)
+        if search:
+            pattern = f"%{search}%"
+            stmt = stmt.where(
+                or_(UserModel.email.ilike(pattern), UserModel.username.ilike(pattern))
+            )
+        total = (
+            await self._db.execute(
+                select(func.count()).select_from(stmt.subquery())
+            )
+        ).scalar_one()
+        stmt = stmt.order_by(UserModel.created_at.desc()).offset((page - 1) * limit).limit(limit)
+        rows = (await self._db.execute(stmt)).scalars().all()
+        return [_to_entity(m) for m in rows], int(total)

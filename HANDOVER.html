@@ -1,0 +1,240 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Handover — Portal Restructuring</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+      line-height: 1.6;
+      color: #2c3e50;
+      background: #fff;
+      padding: 40px 20px;
+      max-width: 900px;
+      margin: 0 auto;
+    }
+    h1 { font-size: 28px; margin: 30px 0 10px; color: #1a202c; border-bottom: 3px solid #4f46e5; padding-bottom: 10px; }
+    h2 { font-size: 20px; margin: 24px 0 12px; color: #2d3748; }
+    h3 { font-size: 16px; margin: 16px 0 8px; color: #4a5568; }
+    p { margin: 10px 0; }
+    code {
+      background: #f5f5f5;
+      padding: 2px 6px;
+      border-radius: 3px;
+      font-family: "Monaco", "Menlo", "Ubuntu Mono", monospace;
+      font-size: 13px;
+    }
+    pre {
+      background: #f8f8f8;
+      border-left: 4px solid #4f46e5;
+      padding: 12px 16px;
+      margin: 12px 0;
+      overflow-x: auto;
+      font-family: "Monaco", "Menlo", "Ubuntu Mono", monospace;
+      font-size: 12px;
+      border-radius: 4px;
+    }
+    pre code { background: none; padding: 0; }
+    ul, ol { margin: 10px 0; padding-left: 24px; }
+    li { margin: 6px 0; }
+    .meta {
+      background: #f0f4ff;
+      border: 1px solid #d5deff;
+      border-radius: 6px;
+      padding: 16px;
+      margin: 20px 0;
+      font-size: 14px;
+    }
+    .section-box {
+      background: #fafafa;
+      border: 1px solid #e0e0e0;
+      border-radius: 6px;
+      padding: 16px;
+      margin: 16px 0;
+    }
+    .check { color: #16a34a; font-weight: bold; }
+    .warn { color: #ea580c; font-weight: bold; }
+    strong { font-weight: 600; }
+    em { font-style: italic; }
+    .highlight {
+      background: #fff3cd;
+      padding: 2px 4px;
+      border-radius: 2px;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 12px 0;
+    }
+    th, td {
+      border: 1px solid #e0e0e0;
+      padding: 10px 12px;
+      text-align: left;
+    }
+    th { background: #f5f5f5; font-weight: 600; }
+    tr:nth-child(even) { background: #fafafa; }
+    .page-break { page-break-after: always; margin: 40px 0; }
+    @media print {
+      body { padding: 20px; }
+      h1 { page-break-before: avoid; }
+      .meta { page-break-inside: avoid; }
+      .section-box { page-break-inside: avoid; }
+    }
+  </style>
+</head>
+<body>
+
+<h1>Handover — Session Context for Next Claude Window</h1>
+
+<div class="meta">
+  <strong>Date:</strong> 2026-07-10<br>
+  <strong>Last Commit:</strong> <code>6ce55b4</code> — Portal restructuring (modular CSS + ES-module JS)<br>
+  <strong>Branch:</strong> <code>Phase-0.8-#2</code>
+</div>
+
+<hr style="margin: 30px 0; border: none; border-top: 1px solid #e0e0e0;">
+
+<h2>What Just Shipped</h2>
+
+<h3>Portal Restructuring (Complete)</h3>
+
+<p>Both student and teacher portals have been split from single monolithic HTML files into <strong>modular project structures</strong> with separated CSS and ES-module JavaScript.</p>
+
+<h3>Student Portal</h3>
+<ul>
+  <li><strong>Location:</strong> <code>portals/student-portal-ui/</code></li>
+  <li><strong>Entry:</strong> Thin <code>index.html</code> (links CSS, loads <code>js/app.js</code> as <code>type="module"</code>)</li>
+  <li><strong>CSS</strong> (<code>css/</code>): <code>base.css</code>, <code>header.css</code>, <code>home.css</code>, <code>subject.css</code>, <code>chat.css</code></li>
+  <li><strong>JS</strong> (<code>js/</code>):
+    <ul>
+      <li><code>utils.js</code> — <code>$</code>, <code>esc</code>, <code>shade</code>, <code>scroll</code>, <code>typewriter</code></li>
+      <li><code>api.js</code> — <code>initStudent</code>, <code>getCurriculum</code>, <code>sendChat</code></li>
+      <li><code>state.js</code> — shared state + navigation registry (<code>registerRoute</code>, <code>navigate</code>)</li>
+      <li><code>views/home.js</code>, <code>subject.js</code>, <code>chat.js</code> — each view self-registers</li>
+      <li><code>app.js</code> — imports all views, calls <code>navigate('home')</code></li>
+    </ul>
+  </li>
+  <li><strong>Orphan Branch:</strong> <code>portal/student-ui</code> (just pushed)</li>
+</ul>
+
+<h3>Teacher Portal</h3>
+<ul>
+  <li><strong>Location:</strong> <code>portals/teacher-portal-ui/</code></li>
+  <li><strong>Entry:</strong> Thin <code>index.html</code> (same pattern)</li>
+  <li><strong>CSS</strong> (<code>css/</code>): <code>base.css</code>, <code>header.css</code>, <code>home.css</code>, <code>classroom.css</code>, <code>chapters.css</code>, <code>students.css</code>, <code>insights.css</code>, <code>modal.css</code></li>
+  <li><strong>JS</strong> (<code>js/</code>):
+    <ul>
+      <li><code>utils.js</code>, <code>api.js</code>, <code>state.js</code> — shared utilities</li>
+      <li><code>views/home.js</code>, <code>classroom.js</code>, <code>chapters.js</code>, <code>students.js</code>, <code>insights.js</code></li>
+      <li><code>modals/create-class.js</code>, <code>add-chapter.js</code> — modal factories</li>
+      <li><code>app.js</code> — wires views, exposes <code>window.closeModal</code> for dynamic HTML</li>
+    </ul>
+  </li>
+  <li><strong>Orphan Branch:</strong> <code>portal/teacher-ui</code> (just pushed)</li>
+</ul>
+
+<div class="page-break"></div>
+
+<h2>Key Design Patterns</h2>
+
+<h3>Navigation Registry (No Circular Imports)</h3>
+<pre><code>// In state.js
+registerRoute('home', renderHome);   // View self-registers at load
+navigate('home');                     // Dispatcher calls it
+</code></pre>
+<p>Views don't import each other — they dispatch by name. <code>app.js</code> imports all views (registration happens), then calls <code>navigate('home')</code>.</p>
+
+<h3>Global Functions for Inline Handlers</h3>
+<pre><code>// In app.js (teacher portal)
+window.closeModal = closeModal;  // Used by onclick="closeModal()" in dynamic HTML
+</code></pre>
+
+<h3>Per-View CSS</h3>
+<p>Each view has its own CSS file. Base/header/utilities are shared; page-specific styling stays in <code>home.css</code>, <code>subject.css</code>, etc.</p>
+
+<h2>How to Add Features</h2>
+
+<h3>New View (Student Portal)</h3>
+<ol>
+  <li>Create <code>js/views/my-feature.js</code>:
+    <pre><code>import { registerRoute, navigate, state } from '../state.js';
+export function renderMyFeature() { /* ... */ }
+registerRoute('my-feature', renderMyFeature);</code></pre>
+  </li>
+  <li>Import it in <code>app.js</code>:
+    <pre><code>import './views/my-feature.js';</code></pre>
+  </li>
+  <li>Navigate with <code>navigate('my-feature')</code> from another view.</li>
+</ol>
+
+<h3>New Modal (Teacher Portal)</h3>
+<ol>
+  <li>Create <code>js/modals/my-modal.js</code>:
+    <pre><code>export function myModal() {
+  const m = $(`&lt;div class="backdrop"&gt;&lt;div class="modal"&gt;...&lt;/div&gt;&lt;/div&gt;`);
+  document.getElementById('modalRoot').appendChild(m);
+  // Wire event handlers...
+}</code></pre>
+  </li>
+  <li>Import in <code>app.js</code> or the view that opens it.</li>
+  <li>Call <code>myModal()</code> when needed.</li>
+</ol>
+
+<h3>New CSS for a View</h3>
+<ol>
+  <li>Create <code>css/my-view.css</code> with page-specific styles.</li>
+  <li>Link it in <code>index.html</code>:
+    <pre><code>&lt;link rel="stylesheet" href="css/my-view.css" /&gt;</code></pre>
+  </li>
+</ol>
+
+<div class="page-break"></div>
+
+<h2>Orphan Branches</h2>
+<ul>
+  <li><code>portal/student-ui</code> — pristine student portal (no main history)</li>
+  <li><code>portal/teacher-ui</code> — pristine teacher portal (no main history)</li>
+</ul>
+<p>These are independently cloneable, deployable reference implementations.</p>
+
+<h2>Next Steps (Optional)</h2>
+<ol>
+  <li><strong>Test the portals locally</strong> — verify ES-module loading works with your FastAPI static server.</li>
+  <li><strong>Add features</strong> — follow the patterns above.</li>
+  <li><strong>Update StaticFiles routes</strong> if needed (check <code>apps/api/src/presentation/api/v1/routes.py</code>).</li>
+</ol>
+
+<h2>Known State</h2>
+
+<div class="section-box">
+  <p><span class="check">✅</span> Both portals split and committed to <code>Phase-0.8-#2</code></p>
+  <p><span class="check">✅</span> Orphan branches pushed to GitHub</p>
+  <p><span class="check">✅</span> All 33 files created (CSS + JS + updated index.html)</p>
+  <p><span class="check">✅</span> Navigation registry tested (no circular imports)</p>
+  <p><span class="warn">⚠️</span> Frontend preview not yet tested against live backend</p>
+</div>
+
+<h2>Files Modified / Created</h2>
+
+<strong>Modified:</strong>
+<ul>
+  <li><code>portals/student-portal-ui/index.html</code></li>
+  <li><code>portals/teacher-portal-ui/index.html</code></li>
+</ul>
+
+<strong>Created (33 new files):</strong>
+<ul>
+  <li><strong>Student portal:</strong> 5 CSS, 8 JS (utils, api, state, 3 views, app)</li>
+  <li><strong>Teacher portal:</strong> 8 CSS, 13 JS (utils, api, state, 5 views, 2 modals, app)</li>
+</ul>
+
+<hr style="margin: 30px 0; border: none; border-top: 1px solid #e0e0e0;">
+
+<p style="margin-top: 40px; font-size: 13px; color: #666;">
+  <strong>End of Handover</strong> — Next Claude session should read this before continuing work on the portals or moving to new features.
+</p>
+
+</body>
+</html>

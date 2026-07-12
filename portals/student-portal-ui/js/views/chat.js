@@ -1,6 +1,6 @@
-import { state, setAccent, navigate, registerRoute } from '../state.js';
-import { $, esc, shade, scroll, typewriter } from '../utils.js';
-import { sendChat, nextQuestion, answerQuestion } from '../api.js';
+import { state, setAccent, navigate, registerRoute } from '../state.js?v=2';
+import { $, esc, shade, scroll, typewriter } from '../utils.js?v=2';
+import { sendChat, nextQuestion, answerQuestion } from '../api.js?v=2';
 
 // Module-local: the outstanding inline check-question, if any. When set, the
 // next typed message answers it instead of starting a new chat turn.

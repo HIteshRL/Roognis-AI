@@ -1,4 +1,5 @@
-from sqlalchemy import Boolean, String
+from sqlalchemy import Boolean, ForeignKey, String
+from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from src.infrastructure.database.base import Base, TimestampMixin, UUIDMixin
@@ -15,6 +16,9 @@ class UserModel(Base, UUIDMixin, TimestampMixin):
     is_admin: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     role: Mapped[str] = mapped_column(String(20), default="student", nullable=False)
     clerk_id: Mapped[str | None] = mapped_column(String(255), unique=True, nullable=True, index=True)
+    institution_id: Mapped[str | None] = mapped_column(
+        UUID(as_uuid=False), ForeignKey("institutions.id", ondelete="SET NULL"), nullable=True
+    )
 
     profile: Mapped["ProfileModel"] = relationship(back_populates="user", uselist=False, cascade="all, delete-orphan")  # type: ignore[name-defined]  # noqa: F821
     settings: Mapped["SettingsModel"] = relationship(back_populates="user", uselist=False, cascade="all, delete-orphan")  # type: ignore[name-defined]  # noqa: F821

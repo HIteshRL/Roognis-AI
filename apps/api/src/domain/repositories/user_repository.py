@@ -25,3 +25,12 @@ class AbstractUserRepository(ABC):
 
     @abstractmethod
     async def delete(self, user_id: UUID) -> None: ...
+
+    @abstractmethod
+    async def list(
+        self,
+        page: int = 1,
+        limit: int = 50,
+        role: str | None = None,
+        search: str | None = None,
+    ) -> tuple[list[User], int]: ...

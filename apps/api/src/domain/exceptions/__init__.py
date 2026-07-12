@@ -40,6 +40,11 @@ class RateLimitExceeded(DomainException):
     status_code = 429
 
 
+class ConcurrencyConflict(DomainException):
+    code = "CONFLICT"
+    status_code = 409
+
+
 class LLMError(DomainException):
     code = "LLM_ERROR"
     status_code = 502

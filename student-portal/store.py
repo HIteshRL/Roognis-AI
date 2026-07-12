@@ -37,14 +37,31 @@ def get_classroom(cid: str) -> dict | None:
 def create_classroom(name, subject, section, grade, color, icon, teacher_name) -> dict:
     cid = gen_id()
     with connect() as c:
+        # is_open=0 → Google-Classroom roster model: a student is in the class only
+        # if the teacher added them or they joined with the class code.
         c.execute(
             "INSERT INTO classrooms(id,name,subject,section,grade,color,icon,join_code,"
             "teacher_name,is_open,is_seed,created_at) VALUES(?,?,?,?,?,?,?,?,?,0,0,?)",
-            (cid, name, subject, section, grade, color or "#4f46e5", icon or "📘",
+            (cid, name, subject, section, grade, color or "#16a34a", icon or "📘",
              gen_code(), teacher_name, now()),
         )
         c.commit()
     return get_classroom(cid)
+
+
+def delete_classroom(cid: str) -> None:
+    """Remove a class and everything under it (chapters, material, roster, chats)."""
+    with connect() as c:
+        for (ch,) in c.execute("SELECT id FROM chapters WHERE classroom_id=?", (cid,)).fetchall():
+            c.execute("DELETE FROM chunks WHERE chapter_id=?", (ch,))
+            c.execute("DELETE FROM documents WHERE chapter_id=?", (ch,))
+        c.execute("DELETE FROM chapters WHERE classroom_id=?", (cid,))
+        c.execute("DELETE FROM enrollments WHERE classroom_id=?", (cid,))
+        for (cv,) in c.execute("SELECT id FROM conversations WHERE classroom_id=?", (cid,)).fetchall():
+            c.execute("DELETE FROM messages WHERE conversation_id=?", (cv,))
+        c.execute("DELETE FROM conversations WHERE classroom_id=?", (cid,))
+        c.execute("DELETE FROM classrooms WHERE id=?", (cid,))
+        c.commit()
 
 
 # ── Chapters ──────────────────────────────────────────────────────────────────
@@ -136,6 +153,18 @@ def enrollment_status(classroom_id: str, student_id: str) -> str:
         r = _row(c.execute("SELECT status FROM enrollments WHERE classroom_id=? AND student_id=?",
                            (classroom_id, student_id)))
         return r["status"] if r else "none"
+
+
+def enroll(classroom_id: str, student_id: str, status: str = "approved") -> None:
+    """Upsert an enrollment at the given status — used when the teacher adds a
+    student to the roster, and when a student joins with the class code
+    (Google-Classroom behaviour: a valid code puts you straight in)."""
+    with connect() as c:
+        c.execute("INSERT OR IGNORE INTO enrollments(id,classroom_id,student_id,status,requested_at)"
+                  " VALUES(?,?,?,?,?)", (gen_id(), classroom_id, student_id, status, now()))
+        c.execute("UPDATE enrollments SET status=? WHERE classroom_id=? AND student_id=?",
+                  (status, classroom_id, student_id))
+        c.commit()
 
 
 def request_enrollment(classroom_id: str, student_id: str) -> str:

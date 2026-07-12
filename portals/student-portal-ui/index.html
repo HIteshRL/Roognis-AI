@@ -4,25 +4,102 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Roognis · Class 10 ICSE</title>
-  <link rel="stylesheet" href="css/base.css" />
-  <link rel="stylesheet" href="css/header.css" />
-  <link rel="stylesheet" href="css/home.css" />
-  <link rel="stylesheet" href="css/subject.css" />
-  <link rel="stylesheet" href="css/chat.css" />
+  <link rel="stylesheet" href="css/base.css?v=3" />
+  <link rel="stylesheet" href="css/header.css?v=3" />
+  <link rel="stylesheet" href="css/home.css?v=3" />
+  <link rel="stylesheet" href="css/subject.css?v=3" />
+  <link rel="stylesheet" href="css/chat.css?v=3" />
+  <link rel="stylesheet" href="css/drawer.css?v=3" />
+  <link rel="stylesheet" href="css/insights.css?v=1" />
 </head>
 <body>
 
 <header>
   <div class="wrap hbar">
+    <button id="navBtn" class="hbtn" title="Menu" aria-label="Open menu">☰</button>
     <span class="logo"></span>
     <span class="brand">Roognis</span>
     <span class="pill">Class 10 · ICSE</span>
     <span id="mode" class="mode offline"><span class="dot"></span>…</span>
+    <button id="insightsBtn" class="hbtn" title="My Progress" aria-label="My Progress">📊</button>
+    <button id="themeBtn" class="hbtn" title="Toggle light / dark" aria-label="Toggle theme">🌙</button>
+    <button id="studioBtn" class="hbtn" title="Image Studio" aria-label="Open image studio">✨</button>
   </div>
 </header>
 
 <div id="app" class="wrap"></div>
 
-<script type="module" src="js/app.js"></script>
+<!-- Left slide-out navigation menu -->
+<aside id="navDrawer" class="drawer left" aria-hidden="true">
+  <div class="drawer-head">
+    <span class="drawer-title">📚 Menu</span>
+    <button id="navClose" class="hbtn" aria-label="Close">✕</button>
+  </div>
+  <div class="drawer-body nav-body">
+    <button class="nav-item" id="navHome"><span class="ni-ic">🏠</span> Home</button>
+    <button class="nav-item" id="navInsights"><span class="ni-ic">📊</span> My Progress</button>
+    <div class="nav-label">My classes</div>
+    <div id="navSubjects" class="nav-subjects"></div>
+    <button class="nav-item" id="navJoin"><span class="ni-ic">➕</span> Join class</button>
+    <div class="nav-sep"></div>
+    <a class="nav-item" href="/teacher"><span class="ni-ic">🍎</span> Teacher Portal</a>
+    <div class="nav-foot">
+      <button id="navWho" class="nav-who" title="Switch student">Student</button>
+      <button id="navTheme" class="hbtn" title="Toggle light / dark">🌙</button>
+    </div>
+  </div>
+</aside>
+
+<!-- Image Studio — right slide-out drawer -->
+<div id="scrim" class="scrim"></div>
+<aside id="imgDrawer" class="drawer" aria-hidden="true">
+  <div class="drawer-head">
+    <span class="drawer-title">✨ Image Studio</span>
+    <button id="drawerClose" class="hbtn" aria-label="Close">✕</button>
+  </div>
+  <div class="drawer-body studio">
+    <div class="phone-stage">
+      <div class="phone">
+        <span class="phone-island"></span>
+        <div class="phone-screen" id="phoneScreen">
+          <div class="ph-empty" id="phEmpty">
+            <div class="ph-orb">🖼️</div>
+            <b>Your image appears here</b>
+            <span>Describe a diagram or illustration, then generate — shown at
+                  iPhone&nbsp;15 portrait size.</span>
+          </div>
+          <img id="phImg" class="ph-img" alt="" hidden />
+          <div class="ph-load" id="phLoad" hidden>
+            <div class="ph-spin"></div>
+            <span>Generating…</span>
+          </div>
+          <div class="ph-err" id="phErr" hidden></div>
+        </div>
+      </div>
+    </div>
+    <div class="studio-cap">iPhone&nbsp;15 portrait · 1179 × 2556</div>
+    <div class="studio-controls">
+      <textarea id="imgPrompt" rows="2" maxlength="1000"
+                placeholder="e.g. A labelled diagram of the human heart"></textarea>
+      <button class="studio-gen" id="imgGen">✨ Generate</button>
+    </div>
+  </div>
+</aside>
+
+<!-- Join class — code entry modal -->
+<div id="joinModal" class="jm-back" hidden>
+  <div class="jm-card">
+    <h3>Join a class</h3>
+    <p>Enter the class code your teacher shared.</p>
+    <input id="joinCode" maxlength="8" autocomplete="off" placeholder="e.g. K7PQXR" />
+    <div class="jm-err" id="joinErr" hidden></div>
+    <div class="jm-row">
+      <button class="jm-cancel" id="joinCancel">Cancel</button>
+      <button class="jm-go" id="joinGo">Join</button>
+    </div>
+  </div>
+</div>
+
+<script type="module" src="js/app.js?v=3"></script>
 </body>
 </html>

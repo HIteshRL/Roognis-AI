@@ -6,9 +6,13 @@ from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
+import anyio
+
 import bridge
 import engine
+import image_gen
 import ingest
+import insights
 import question_engine
 import store
 
@@ -20,19 +24,36 @@ _STATIC = Path(__file__).resolve().parent / "static"
 _PORTAL = Path(__file__).resolve().parent.parent / "portals" / "student-portal-ui"
 app.mount("/css", StaticFiles(directory=_PORTAL / "css"), name="portal-css")
 app.mount("/js", StaticFiles(directory=_PORTAL / "js"), name="portal-js")
+app.mount("/fonts", StaticFiles(directory=_PORTAL / "fonts"), name="portal-fonts")
 
 _SUBJECT_ICONS = {s["name"]: s["icon"] for s in __import__("curriculum").SUBJECTS}
 
 
+@app.middleware("http")
+async def _no_store_portal(request, call_next):
+    """Portal HTML/CSS/JS must never be served stale — the demo is edited live and a
+    cached bundle would hide fixes. API responses keep default caching."""
+    resp = await call_next(request)
+    p = request.url.path
+    if p in ("/", "/teacher") or p.startswith("/css") or p.startswith("/js") or p.startswith("/static"):
+        resp.headers["Cache-Control"] = "no-store, must-revalidate"
+        resp.headers["Pragma"] = "no-cache"
+    return resp
+
+
 # ── Shared / student read models ──────────────────────────────────────────────
-def _classrooms_payload() -> list[dict]:
+def _classrooms_payload(student_id: str | None = None) -> list[dict]:
+    """All classes (teacher view), or only the classes a student is enrolled in
+    (Google-Classroom roster model) when student_id is given."""
     out = []
     for room in store.list_classrooms():
+        if student_id and store.enrollment_status(room["id"], student_id) != "approved":
+            continue
         out.append({
             "id": room["id"], "name": room["name"], "icon": room["icon"] or "📘",
             "color": room["color"] or "#4f46e5", "open": bool(room["is_open"]),
             "seed": bool(room["is_seed"]), "teacher": room["teacher_name"],
-            "join_code": room["join_code"],
+            "join_code": room["join_code"], "students": room["student_count"],
             "chapters": [
                 {"id": ch["id"], "title": ch["title"], "summary": ch["summary"] or "",
                  "doc_count": ch["doc_count"]}
@@ -43,9 +64,9 @@ def _classrooms_payload() -> list[dict]:
 
 
 @app.get("/api/curriculum")
-async def curriculum_api():
+async def curriculum_api(student_id: str | None = None):
     return {"grade": "10", "board": "ICSE", "mode": engine.MODE, "online": engine.ONLINE,
-            "subjects": _classrooms_payload()}
+            "subjects": _classrooms_payload(student_id)}
 
 
 # ── Student ───────────────────────────────────────────────────────────────────
@@ -74,6 +95,18 @@ async def chat_api(body: ChatIn):
                 "mode": engine.MODE, "conversation_id": None}
     return await engine.ask(body.question, body.subject_id, body.chapter_id,
                             body.student_id, body.conversation_id)
+
+
+# ── Image Studio (right slide-out) ────────────────────────────────────────────
+class ImageIn(BaseModel):
+    prompt: str = Field(min_length=1, max_length=1000)
+
+
+@app.post("/api/image/generate")
+async def image_generate(body: ImageIn):
+    """Text-to-image for the studio panel. Fail-open: always returns 200 with an
+    {ok, data_url|error} body so the UI can render the result or the reason."""
+    return await anyio.to_thread.run_sync(image_gen.generate, body.prompt.strip())
 
 
 # ── Learner Intelligence: inline questioning ──────────────────────────────────
@@ -181,14 +214,21 @@ async def student_join(body: JoinIn):
     if not rooms:
         raise HTTPException(404, "No class found for that code")
     room = rooms[0]
-    status = ("approved" if room["is_open"]
-              else store.request_enrollment(room["id"], body.student_id))
-    return {"classroom_id": room["id"], "name": room["name"], "status": status}
+    # Google-Classroom behaviour: a valid class code puts the student straight in.
+    store.enroll(room["id"], body.student_id, "approved")
+    return {"classroom_id": room["id"], "name": room["name"], "status": "approved"}
 
 
 @app.get("/api/student/{student_id}/history")
 async def student_history(student_id: str):
     return store.list_conversations_for_student(student_id)
+
+
+@app.get("/api/student/{student_id}/insights")
+async def student_insights(student_id: str):
+    """Learner-intelligence dashboard payload — mastery, gaps, skills,
+    recommendations, timeline, analytics. Derived fresh from the evidence log."""
+    return insights.student_insights(student_id)
 
 
 @app.get("/api/conversation/{conversation_id}/messages")
@@ -264,6 +304,29 @@ async def chapter_documents(chid: str):
 @app.get("/api/teacher/classrooms/{cid}/students")
 async def classroom_students(cid: str):
     return store.list_enrollments(cid)
+
+
+class AddStudentIn(BaseModel):
+    name: str = Field(min_length=1, max_length=60)
+
+
+@app.post("/api/teacher/classrooms/{cid}/students", status_code=201)
+async def add_student(cid: str, body: AddStudentIn):
+    """Teacher adds a student to the roster by name (Google-Classroom 'invite')."""
+    if not store.get_classroom(cid):
+        raise HTTPException(404, "Class not found")
+    student = store.get_or_create_student(body.name)
+    store.enroll(cid, student["id"], "approved")
+    return {"student_id": student["id"], "student_name": student["name"], "status": "approved"}
+
+
+@app.delete("/api/teacher/classrooms/{cid}")
+async def delete_classroom(cid: str):
+    if not store.get_classroom(cid):
+        raise HTTPException(404, "Class not found")
+    store.delete_classroom(cid)
+    engine.rebuild_corpus()
+    return {"ok": True}
 
 
 @app.post("/api/teacher/classrooms/{cid}/students/{sid}/{action}")

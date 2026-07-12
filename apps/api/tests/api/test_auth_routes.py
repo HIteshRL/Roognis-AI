@@ -34,6 +34,8 @@ async def test_register_returns_structured_response():
 
     mock_service = AsyncMock()
     mock_service.register = AsyncMock(return_value=(_mock_user_response(), "test-token"))
+    mock_service.issue_refresh_token = AsyncMock(return_value="test-refresh-token")
+    mock_service.request_email_verification = AsyncMock(return_value=None)
 
     app.dependency_overrides[dependencies.get_auth_service] = lambda: mock_service
 
@@ -52,6 +54,7 @@ async def test_register_returns_structured_response():
     assert "request_id" in body
     assert "token" in body["data"]
     assert body["data"]["token"] == "test-token"
+    assert body["data"]["refresh_token"] == "test-refresh-token"
 
 
 @pytest.mark.asyncio

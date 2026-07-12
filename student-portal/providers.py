@@ -116,10 +116,31 @@ class DbRetrieval:
         return ctx, {"embedding_ms": 0.0, "retrieval_ms": 0.0}
 
 
+# Generic tutoring/question words that carry no subject signal — a question made
+# only of these is a legitimate follow-up, never an off-topic question.
+_GENERIC_TERMS = frozenset({
+    "work", "works", "working", "explain", "explanation", "example", "examples",
+    "mean", "means", "meaning", "understand", "tell", "more", "why", "how",
+    "what", "when", "where", "which", "who", "difference", "reason", "reasons",
+    "happen", "happens", "happening", "use", "used", "uses", "using", "summary",
+    "summarise", "summarize", "simple", "simpler", "simply", "give", "show",
+    "describe", "define", "definition", "concept", "topic", "question", "answer",
+    "help", "please", "again", "elaborate", "detail", "details", "point", "points",
+})
+
+
+def is_generic_followup(question: str) -> bool:
+    """True when a question carries no subject keywords — a conversational follow-up
+    ('how does it work?', 'why?', 'give an example') that refers to the current chapter."""
+    return len(tokens(question) - _GENERIC_TERMS) <= 2
+
+
 class CorpusGuardrail(GuardrailService):
-    """Real deterministic safety rules (inherited) + a corpus-based subject gate
-    that works with or without an LLM — a question is off-topic if it barely
-    overlaps the whole subject's vocabulary."""
+    """Real deterministic safety rules (inherited) + a corpus-based subject gate.
+
+    Defaults to ALLOW: only refuses a question that clearly belongs to a different
+    subject. Generic follow-ups pass; off-chapter noise is handled by the concept-
+    grounding gate, not here."""
 
     def __init__(self, subject_corpus: dict[str, set[str]], subject_floor: float = 0.34) -> None:
         super().__init__(llm=None)
@@ -129,14 +150,31 @@ class CorpusGuardrail(GuardrailService):
     async def check_subject_relevance(
         self, question: str, subject: str | None, chapter: str | None = None
     ) -> RelevanceVerdict:
+        # Philosophy: refusing a legitimate learner is the worst failure a tutor can
+        # make. So the subject gate DEFAULTS TO ALLOW and only refuses a question that
+        # clearly belongs to a *different* known subject. Generic follow-ups
+        # ("how does it work?", "why?", "give an example") always pass — they carry no
+        # subject keywords by design. Off-chapter noise is caught later by the concept-
+        # grounding gate ("not covered in this chapter"), not here.
         if not subject:
             return RelevanceVerdict(True, 1.0, "no subject")
         q = tokens(question)
-        if not q:
-            return RelevanceVerdict(True, 0.0, "no content words")
-        score = _overlap(q, self._corpus.get(subject, set()))
-        return RelevanceVerdict(score >= self._floor, round(score, 3),
-                                f"subject overlap {score:.2f}")
+        salient = q - _GENERIC_TERMS
+        if len(salient) <= 2:
+            return RelevanceVerdict(True, 1.0, "generic follow-up")
+
+        this_subject = _overlap(salient, self._corpus.get(subject, set()))
+        best_other = max(
+            (_overlap(salient, vocab)
+             for name, vocab in self._corpus.items() if name != subject),
+            default=0.0,
+        )
+        # Only off-topic if it matches another subject well AND clearly better than this one.
+        off_topic = best_other >= self._floor and best_other > this_subject + 0.15
+        return RelevanceVerdict(
+            not off_topic, round(this_subject, 3),
+            "belongs to another subject" if off_topic else "on subject",
+        )
 
 
 class OfflineTutorProvider(AbstractLLMProvider):

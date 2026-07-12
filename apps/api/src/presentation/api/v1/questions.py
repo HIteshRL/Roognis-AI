@@ -1,9 +1,8 @@
 """Learner Intelligence — QuestionEngine, evidence, preferences, recall, context."""
-import hmac
 from typing import Annotated
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, Header, HTTPException, Query, Request, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 
 from src.application.dtos.question import (
     AnswerEvaluationResponse,
@@ -19,25 +18,21 @@ from src.application.dtos.question import (
 )
 from src.application.dtos.user import UserResponse
 from src.application.interfaces.dependencies import (
-    get_confidence_updater,
+    get_bridge_ingestion_service,
     get_current_user,
     get_evidence_collector,
     get_learner_intelligence_engine,
     get_preference_inference_engine,
     get_questioning_engine,
     get_recall_scheduler,
+    require_bridge_token,
 )
-from src.application.services.confidence_updater import ConfidenceUpdater
+from src.application.services.bridge_ingestion_service import BridgeIngestionService
 from src.application.services.evidence_collector import EvidenceCollector
 from src.application.services.learner_intelligence_engine import LearnerIntelligenceEngine
 from src.application.services.preference_inference_engine import PreferenceInferenceEngine
 from src.application.services.questioning_engine import QuestioningEngine, QuestionOwnershipError
 from src.application.services.recall_scheduler import RecallScheduler
-from src.config import Settings, get_settings
-from src.domain.entities.user import User
-from src.infrastructure.database.repositories.learning_repository import ConceptNodeRepository
-from src.infrastructure.database.repositories.user_repository import UserRepository
-from src.infrastructure.database.session import AsyncSession, get_db
 from src.presentation.api.response import ok
 
 router = APIRouter(prefix="/learner", tags=["Learner Intelligence"])
@@ -235,48 +230,20 @@ async def get_learner_context(
 
 # ── Bridge: ingest evidence from an external surface (default OFF) ─────────────
 
-@router.post("/evidence/ingest", response_model=None)
+@router.post("/evidence/ingest", response_model=None, dependencies=[Depends(require_bridge_token)])
 async def ingest_evidence(
     body: BridgeEvidenceRequest,
     request: Request,
-    db: Annotated[AsyncSession, Depends(get_db)],
-    settings: Annotated[Settings, Depends(get_settings)],
-    confidence_updater: Annotated[ConfidenceUpdater, Depends(get_confidence_updater)],
-    x_bridge_token: Annotated[str | None, Header()] = None,
+    bridge: Annotated[BridgeIngestionService, Depends(get_bridge_ingestion_service)],
 ):
-    """Service-token authenticated. Maps an external learner ref to a namespaced
-    bridge user and drives the real ConfidenceUpdater (mastery + gap + recall +
-    evidence). Disabled unless BRIDGE_INGEST_TOKEN is configured."""
-    token = settings.bridge_ingest_token
-    if not token:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail={"code": "BRIDGE_DISABLED", "message": "Evidence bridge is not enabled"},
-        )
-    if not x_bridge_token or not hmac.compare_digest(x_bridge_token, token):
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail={"code": "BRIDGE_UNAUTHORIZED", "message": "Invalid bridge token"},
-        )
+    """Fold evidence from an external surface into the real engine.
 
-    # Namespaced bridge user (unusable password → cannot log in via credentials).
-    user_repo = UserRepository(db)
-    email = f"bridge+{body.external_ref}@bridge.local"
-    user = await user_repo.get_by_email(email)
-    if user is None:
-        user = await user_repo.create(User(
-            email=email,
-            username=f"bridge_{body.external_ref}"[:50],
-            password_hash="!bridge-no-login",
-            role="student",
-        ))
-
-    node = await ConceptNodeRepository(db).get_or_create(body.concept_name, None, None, None)
-
-    evidence = await confidence_updater.apply_signal(
-        user_id=user.id,
-        concept_id=node.id,
-        concept_name=node.name,
+    Auth is handled by the ``require_bridge_token`` dependency; the mapping of the
+    external learner ref to a bridge user and the state update live in the service.
+    """
+    evidence = await bridge.ingest(
+        external_ref=body.external_ref,
+        concept_name=body.concept_name,
         signal=body.signal,
         objective=body.objective,
         source=body.source,
@@ -287,8 +254,8 @@ async def ingest_evidence(
     )
     return ok(
         {
-            "user_id": str(user.id),
-            "concept_id": str(node.id),
+            "user_id": str(evidence.user_id),
+            "concept_id": str(evidence.concept_id),
             "signal": evidence.signal,
             "confidence_after": evidence.confidence_after,
         },

@@ -82,9 +82,26 @@ class Settings(BaseSettings):
     retrieval_enabled: bool = True
 
     # ── Phase 0.2: Storage ───────────────────────────────────────────────────
-    storage_provider: Literal["local"] = "local"
+    # "s3" covers any S3-compatible endpoint: AWS S3, Cloudflare R2, MinIO —
+    # point s3_endpoint_url at the provider (empty = AWS default).
+    storage_provider: Literal["local", "s3"] = "local"
     storage_local_path: str = "./uploads"
     max_upload_size_mb: int = 50
+    s3_bucket: str = ""
+    s3_region: str = "auto"
+    s3_endpoint_url: str = ""
+    s3_access_key_id: str = ""
+    s3_secret_access_key: str = ""
+
+    # ── LMS: Email (password reset / verification / invitations) ────────────
+    email_provider: Literal["console", "smtp"] = "console"
+    smtp_host: str = ""
+    smtp_port: int = 587
+    smtp_username: str | None = None
+    smtp_password: str | None = None
+    smtp_sender: str = "no-reply@roognis.ai"
+    smtp_use_tls: bool = True
+    frontend_base_url: str = "http://localhost:3000"
 
     # ── Phase 0.6: Vision / OCR ──────────────────────────────────────────────
     # Scanned PDFs and uploaded images have no text layer. When enabled, pages

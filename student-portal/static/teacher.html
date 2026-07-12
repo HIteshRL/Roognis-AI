@@ -3,125 +3,197 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>Roognis · Teacher</title>
+<title>Roognis · Classroom</title>
 <style>
-  :root{--bg:#f4f6fb;--card:#fff;--fg:#141a2e;--muted:#657089;--line:#e6e9f2;--brand:#4f46e5;--brand2:#7c3aed;
-    --accent:#4f46e5;--shadow:0 1px 2px rgba(20,26,46,.06),0 8px 24px rgba(20,26,46,.06);--radius:16px}
-  *{box-sizing:border-box}html,body{margin:0;height:100%}
-  body{font-family:"Segoe UI",-apple-system,BlinkMacSystemFont,Roboto,Arial,sans-serif;
-    background:radial-gradient(1200px 600px at 80% -10%,#eef1ff,var(--bg) 55%);color:var(--fg)}
-  button{font-family:inherit;cursor:pointer}
-  .wrap{max-width:1000px;margin:0 auto;padding:0 20px}
-  header{position:sticky;top:0;z-index:20;background:rgba(255,255,255,.75);backdrop-filter:blur(8px);border-bottom:1px solid var(--line)}
-  .hbar{display:flex;align-items:center;gap:12px;height:60px}
-  .logo{width:30px;height:30px;border-radius:9px;background:linear-gradient(135deg,var(--brand),var(--brand2))}
-  .brand{font-weight:800;font-size:18px;letter-spacing:-.02em}
-  .pill{font-size:12px;font-weight:700;color:#4338ca;background:#eef0ff;border:1px solid #e0e3ff;padding:4px 10px;border-radius:999px}
+  @font-face{font-family:"Inter var";font-style:normal;font-weight:100 900;font-display:swap;src:url("/fonts/inter-var.woff2?v=1") format("woff2")}
+  :root{--bg:#f2f8f3;--card:rgba(255,255,255,.78);--fg:#16241c;--muted:#5c7267;--line:rgba(22,60,40,.12);--brand:#16a34a;--brand2:#f59e0b;--accent:#16a34a;
+    --glass-bg:rgba(255,255,255,.62);--glass-strong:rgba(255,255,255,.86);--glass-border:rgba(255,255,255,.72);--glass-blur:18px;
+    --shadow:0 1px 2px rgba(16,40,28,.05),0 8px 24px rgba(16,40,28,.07);--shadow-lg:0 16px 44px rgba(16,40,28,.16);--radius:14px;
+    --field:radial-gradient(1100px 640px at 10% -10%,rgba(74,222,128,.20),transparent 58%),radial-gradient(900px 560px at 94% 2%,rgba(251,191,36,.16),transparent 55%),linear-gradient(180deg,#f1faf3 0%,#f6f6ee 58%,#fdf3e9 100%)}
+  :root[data-theme=dark]{--bg:#0b120e;--card:rgba(28,38,32,.66);--fg:#e8f2ea;--muted:#9db3a6;--line:rgba(150,200,170,.14);--brand:#34d399;--brand2:#fbbf24;--accent:#34d399;color-scheme:dark;
+    --glass-bg:rgba(26,36,30,.58);--glass-strong:rgba(30,42,35,.78);--glass-border:rgba(150,210,175,.16);--glass-blur:20px;
+    --shadow:0 1px 2px rgba(0,0,0,.30),0 10px 30px rgba(0,0,0,.40);--shadow-lg:0 20px 54px rgba(0,0,0,.55);
+    --field:radial-gradient(1100px 640px at 10% -10%,rgba(16,185,129,.16),transparent 58%),radial-gradient(900px 560px at 94% 2%,rgba(180,130,60,.14),transparent 55%),linear-gradient(180deg,#0a0f0c 0%,#0b120e 60%,#0d1310 100%)}
+  *{box-sizing:border-box}html,body{margin:0;min-height:100%}
+  body{font-family:"SF Pro Display","SF Pro Text",-apple-system,BlinkMacSystemFont,"Inter var",Inter,"Segoe UI",Roboto,Arial,sans-serif;
+    background:var(--field) fixed;color:var(--fg);-webkit-font-smoothing:antialiased;letter-spacing:-.011em}
+  button{font-family:inherit;cursor:pointer;color:inherit}
+  a{color:inherit}
+  .wrap{max-width:1080px;margin:0 auto;padding:0 22px}
+
+  /* Top app bar */
+  header{position:sticky;top:0;z-index:20;background:var(--glass-strong);backdrop-filter:saturate(1.8) blur(18px);-webkit-backdrop-filter:saturate(1.8) blur(18px);border-bottom:1px solid var(--glass-border)}
+  .hbar{display:flex;align-items:center;gap:12px;height:62px}
+  .logo{width:30px;height:30px;border-radius:9px;background:linear-gradient(135deg,var(--brand),var(--brand2));box-shadow:0 4px 14px rgba(22,163,74,.35)}
+  .brand{font-weight:800;font-size:18px;letter-spacing:-.03em}
+  .pill{font-size:12px;font-weight:700;color:var(--brand);background:color-mix(in srgb,var(--brand) 14%,transparent);border:1px solid color-mix(in srgb,var(--brand) 30%,transparent);padding:4px 10px;border-radius:999px}
   .rightlink{margin-left:auto;font-size:13px;font-weight:600;color:var(--muted);text-decoration:none}
   .rightlink:hover{color:var(--fg)}
-  .btn{display:inline-flex;align-items:center;gap:6px;border:none;border-radius:10px;background:var(--brand);color:#fff;font-weight:700;font-size:13px;padding:10px 15px}
-  .btn:hover{background:#4338ca}.btn.ghost{background:transparent;color:var(--muted)}.btn.ghost:hover{background:#eef0ff}
-  .btn.sm{padding:7px 11px;font-size:12px}.btn.green{background:#1e8e3e}.btn.red{background:#d93025}
-  .row{display:flex;align-items:center;justify-content:space-between}
-  h1{font-size:26px;letter-spacing:-.02em;margin:26px 0 2px}.sub{color:var(--muted);font-size:14px}
-  .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:16px;padding:20px 0 40px}
-  .cc{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);overflow:hidden;box-shadow:var(--shadow);cursor:pointer;transition:transform .15s,box-shadow .15s}
-  .cc:hover{transform:translateY(-3px);box-shadow:0 12px 30px rgba(20,26,46,.12)}
-  .cc .ban{height:78px;padding:14px;color:#fff;position:relative}
-  .cc .ban h3{margin:0;font-size:17px}.cc .ban .s{font-size:12.5px;color:rgba(255,255,255,.85)}
-  .cc .mono{position:absolute;right:14px;bottom:-22px;width:48px;height:48px;border-radius:50%;border:3px solid #fff;display:flex;align-items:center;justify-content:center;font-size:22px}
-  .cc .body{padding:22px 14px 12px;color:var(--muted);font-size:12.5px;display:flex;gap:14px}
-  .empty{border:1px dashed var(--line);border-radius:var(--radius);padding:50px;text-align:center;color:var(--muted)}
+  .hbtn{width:36px;height:36px;display:inline-flex;align-items:center;justify-content:center;border-radius:11px;border:1px solid var(--glass-border);background:var(--glass-bg);font-size:16px;transition:transform .14s,background .14s}
+  .hbtn:hover{transform:translateY(-1px);background:color-mix(in srgb,var(--accent) 12%,var(--glass-bg))}
+  .me{width:34px;height:34px;border-radius:50%;background:linear-gradient(135deg,var(--brand),#0f766e);color:#fff;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:14px}
+
+  .row{display:flex;align-items:center;justify-content:space-between;gap:12px}
+  h1{font-size:26px;letter-spacing:-.03em;margin:28px 0 2px;font-weight:800}
+  .sub{color:var(--muted);font-size:14px}
+  .btn{display:inline-flex;align-items:center;gap:6px;border:none;border-radius:11px;background:linear-gradient(135deg,var(--brand),#15803d);color:#fff;font-weight:700;font-size:13px;padding:10px 16px;box-shadow:0 6px 16px rgba(22,163,74,.28);transition:filter .14s,transform .14s}
+  .btn:hover{filter:brightness(1.06);transform:translateY(-1px)}
+  .btn.ghost{background:transparent;color:var(--muted);box-shadow:none;border:1px solid var(--glass-border)}
+  .btn.ghost:hover{background:color-mix(in srgb,var(--accent) 12%,transparent);color:var(--fg)}
+  .btn.sm{padding:8px 12px;font-size:12.5px}
+  .btn.green{background:#16a34a;box-shadow:none}.btn.red{background:#dc2626;box-shadow:none}
+
+  /* ── Class cards (Google Classroom) ── */
+  .gc-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:22px;padding:22px 0 60px}
+  .gc-card{border-radius:14px;border:1px solid var(--glass-border);background:var(--card);backdrop-filter:saturate(1.4) blur(var(--glass-blur));-webkit-backdrop-filter:saturate(1.4) blur(var(--glass-blur));overflow:hidden;cursor:pointer;box-shadow:var(--shadow);transition:transform .16s,box-shadow .16s}
+  .gc-card:hover{transform:translateY(-3px);box-shadow:var(--shadow-lg)}
+  .gc-banner{height:96px;padding:15px 16px;color:#fff;position:relative}
+  .gc-banner h3{margin:0;font-size:20px;font-weight:700;letter-spacing:-.02em;max-width:210px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .gc-banner .sec{font-size:13px;opacity:.92;margin-top:2px}
+  .gc-banner .tch{position:absolute;left:16px;bottom:12px;font-size:12.5px;opacity:.92;font-weight:600}
+  .gc-avatar{position:absolute;right:16px;bottom:-24px;width:56px;height:56px;border-radius:50%;border:3px solid var(--card);display:flex;align-items:center;justify-content:center;font-size:26px;background:#fff}
+  .gc-body{height:52px;border-bottom:1px solid var(--line)}
+  .gc-foot{display:flex;align-items:center;gap:14px;justify-content:flex-end;padding:13px 16px;color:var(--muted);font-size:12.5px;font-weight:600}
+  .empty{border:1px dashed var(--glass-border);border-radius:var(--radius);padding:48px;text-align:center;color:var(--muted);background:var(--card)}
+  .empty .big{font-size:34px;margin-bottom:10px}
+
+  /* ── Class detail ── */
   .back{background:none;border:none;color:var(--muted);font-weight:600;font-size:13px;padding:18px 0 0}
-  .band{display:flex;align-items:center;gap:14px;border-radius:var(--radius);padding:20px;color:#fff;margin-top:10px}
-  .band .mono{width:46px;height:46px;border-radius:12px;background:rgba(255,255,255,.2);display:flex;align-items:center;justify-content:center;font-size:22px}
-  .band h2{margin:0;font-size:21px}.band .s{color:rgba(255,255,255,.85);font-size:13px}
-  .code{margin-left:auto;text-align:right;background:rgba(255,255,255,.16);border-radius:10px;padding:6px 12px}
-  .code .l{font-size:10px;text-transform:uppercase;letter-spacing:.06em;color:rgba(255,255,255,.75)}
-  .code .v{font-family:ui-monospace,Consolas,monospace;font-size:17px;font-weight:700;letter-spacing:.14em}
-  .tabs{display:flex;gap:4px;border-bottom:1px solid var(--line);margin-top:20px}
-  .tab{border:none;background:none;padding:10px 14px;font-weight:700;font-size:13px;color:var(--muted);border-bottom:2px solid transparent}
+  .back:hover{color:var(--fg)}
+  .hero{position:relative;border-radius:18px;padding:22px 24px;color:#fff;margin-top:12px;min-height:150px;display:flex;flex-direction:column;justify-content:flex-end;box-shadow:var(--shadow);overflow:hidden}
+  .hero .deco{position:absolute;right:-30px;top:-40px;font-size:150px;opacity:.16;transform:rotate(-8deg)}
+  .hero h2{margin:0;font-size:28px;font-weight:800;letter-spacing:-.03em}
+  .hero .s{opacity:.92;font-size:14px;margin-top:3px}
+  .hero .code{position:absolute;top:18px;right:20px;text-align:right;background:rgba(255,255,255,.18);border-radius:12px;padding:8px 14px;backdrop-filter:blur(6px)}
+  .hero .code .l{font-size:10px;text-transform:uppercase;letter-spacing:.08em;opacity:.85}
+  .hero .code .v{font-family:ui-monospace,Consolas,monospace;font-size:18px;font-weight:800;letter-spacing:.14em}
+
+  .tabs{display:flex;gap:2px;border-bottom:1px solid var(--line);margin-top:20px}
+  .tab{border:none;background:none;padding:14px 18px;font-weight:700;font-size:14px;color:var(--muted);border-bottom:3px solid transparent;transition:color .14s}
+  .tab:hover{color:var(--fg)}
   .tab.on{color:var(--brand);border-color:var(--brand)}
-  .pane{padding:18px 0 40px}
-  .listrow{display:flex;align-items:center;gap:12px;background:var(--card);border:1px solid var(--line);border-radius:14px;padding:14px 16px;margin-bottom:10px;box-shadow:var(--shadow)}
-  .num{width:34px;height:34px;border-radius:10px;background:#eef0ff;color:var(--brand);display:flex;align-items:center;justify-content:center;font-weight:800}
-  .listrow h4{margin:0;font-size:15px}.listrow .m{color:var(--muted);font-size:12.5px;margin-top:2px}
-  .spacer{margin-left:auto}
-  .docs{margin:6px 0 0 46px;display:flex;flex-direction:column;gap:6px}
-  .doc{display:flex;align-items:center;gap:8px;font-size:12.5px;color:var(--muted)}
-  .stt{font-size:11px;font-weight:800;padding:2px 8px;border-radius:999px}
-  .stt.ready{background:#e8f6ee;color:#166534}.stt.processing{background:#fff7e6;color:#8a6d00}.stt.failed{background:#fdeceb;color:#a12119}
-  .person{display:flex;align-items:center;gap:12px;background:var(--card);border:1px solid var(--line);border-radius:12px;padding:12px 14px;margin-bottom:8px}
-  .av{width:38px;height:38px;border-radius:50%;background:linear-gradient(135deg,var(--brand),#111827);color:#fff;display:flex;align-items:center;justify-content:center;font-weight:800}
-  .badge{font-size:11px;font-weight:800;padding:2px 9px;border-radius:999px;text-transform:capitalize}
-  .badge.approved{background:#e8f6ee;color:#166534}.badge.pending{background:#fff7e6;color:#8a6d00}.badge.denied{background:#f0f1f5;color:#8a93a6}
-  .conv{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:12px 14px;margin-bottom:8px;cursor:pointer}
-  .conv:hover{box-shadow:var(--shadow)}
-  .msgs{margin-top:8px;border-top:1px dashed var(--line);padding-top:10px;display:none;flex-direction:column;gap:8px}
-  .mb{font-size:13px;line-height:1.5;padding:8px 11px;border-radius:10px;max-width:82%}
-  .mb.user{align-self:flex-end;background:#eef0ff}.mb.ai{align-self:flex-start;background:#f5f7fb;border:1px solid var(--line)}
+  .pane{padding:22px 0 60px}
+  .two{display:grid;grid-template-columns:260px 1fr;gap:22px;align-items:start}
+  @media(max-width:760px){.two{grid-template-columns:1fr}}
+
+  .panel{background:var(--card);backdrop-filter:saturate(1.4) blur(var(--glass-blur));-webkit-backdrop-filter:saturate(1.4) blur(var(--glass-blur));border:1px solid var(--glass-border);border-radius:14px;padding:16px 18px;box-shadow:var(--shadow)}
+  .panel h4{margin:0 0 10px;font-size:14px;letter-spacing:-.01em}
+  .codebig{font-family:ui-monospace,Consolas,monospace;font-size:22px;font-weight:800;letter-spacing:.14em;color:var(--brand)}
+
+  /* Stream feed */
+  .post{background:var(--card);backdrop-filter:saturate(1.4) blur(var(--glass-blur));-webkit-backdrop-filter:saturate(1.4) blur(var(--glass-blur));border:1px solid var(--glass-border);border-radius:14px;padding:14px 16px;margin-bottom:12px;cursor:pointer;box-shadow:var(--shadow)}
+  .post:hover{box-shadow:var(--shadow-lg)}
+  .post .ph{display:flex;align-items:center;gap:11px}
+  .post .m{color:var(--muted);font-size:12.5px}
+  .msgs{margin-top:10px;border-top:1px dashed var(--line);padding-top:10px;display:none;flex-direction:column;gap:8px}
+  .mb{font-size:13px;line-height:1.5;padding:8px 11px;border-radius:11px;max-width:82%}
+  .mb.user{align-self:flex-end;background:color-mix(in srgb,var(--brand2) 18%,var(--card));border:1px solid var(--glass-border)}
+  .mb.ai{align-self:flex-start;background:var(--card);border:1px solid var(--glass-border)}
   .dtag{font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.04em;color:var(--muted);margin-top:3px}
-  .backdrop{position:fixed;inset:0;background:rgba(0,0,0,.4);display:flex;align-items:center;justify-content:center;padding:16px;z-index:50}
-  .modal{width:100%;max-width:440px;background:#fff;border-radius:14px}
-  .mh{display:flex;align-items:center;justify-content:space-between;padding:16px 20px;border-bottom:1px solid var(--line)}
-  .mh h2{margin:0;font-size:17px}.mbody{padding:20px}.field{display:flex;flex-direction:column;gap:6px;margin-bottom:13px}
-  .field label{font-size:12px;font-weight:700;color:#3c4149}
-  .field input{border:1px solid var(--line);border-radius:9px;padding:10px 12px;font-size:14px;font-family:inherit}
-  .g2{display:grid;grid-template-columns:1fr 1fr;gap:11px}.mfoot{display:flex;justify-content:flex-end;gap:8px;margin-top:6px}
-  .sw{display:flex;gap:8px;flex-wrap:wrap}.swb{width:28px;height:28px;border-radius:50%;border:0;cursor:pointer}.swb.on{outline:2px solid #111;outline-offset:2px}
-  .toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:#141a2e;color:#fff;padding:10px 16px;border-radius:9px;font-size:13px;opacity:0;transition:.2s;z-index:60}.toast.show{opacity:1}
+
+  /* Classwork topics + materials */
+  .topic{margin-bottom:22px}
+  .topic-h{display:flex;align-items:center;gap:10px;border-bottom:2px solid var(--line);padding-bottom:8px;margin-bottom:8px}
+  .topic-h h3{margin:0;font-size:17px;font-weight:700;color:var(--brand);letter-spacing:-.02em}
+  .topic-h .tsum{color:var(--muted);font-size:12.5px}
+  .mat{display:flex;align-items:center;gap:13px;background:var(--card);backdrop-filter:saturate(1.4) blur(var(--glass-blur));-webkit-backdrop-filter:saturate(1.4) blur(var(--glass-blur));border:1px solid var(--glass-border);border-radius:12px;padding:12px 15px;margin-bottom:8px;box-shadow:var(--shadow)}
+  .mat .mi{width:40px;height:40px;border-radius:50%;background:color-mix(in srgb,var(--brand) 14%,transparent);display:flex;align-items:center;justify-content:center;font-size:19px;flex-shrink:0}
+  .mat h5{margin:0;font-size:14.5px}.mat .mm{color:var(--muted);font-size:12px;margin-top:2px}
+  .stt{font-size:11px;font-weight:800;padding:2px 9px;border-radius:999px;margin-left:auto;flex-shrink:0}
+  .stt.ready{background:color-mix(in srgb,#22c55e 16%,transparent);color:#15803d}
+  .stt.processing{background:color-mix(in srgb,#f59e0b 16%,transparent);color:#b45309}
+  .stt.failed{background:color-mix(in srgb,#ef4444 16%,transparent);color:#b91c1c}
+  :root[data-theme=dark] .stt.ready{color:#4ade80}:root[data-theme=dark] .stt.processing{color:#fcd34d}:root[data-theme=dark] .stt.failed{color:#fca5a5}
+  .matempty{color:var(--muted);font-size:12.5px;padding:6px 2px}
+
+  /* People */
+  .plabel{font-size:15px;font-weight:800;color:var(--brand);border-bottom:1px solid var(--line);padding:8px 0;margin:20px 0 10px}
+  .person{display:flex;align-items:center;gap:13px;background:var(--card);backdrop-filter:saturate(1.4) blur(var(--glass-blur));-webkit-backdrop-filter:saturate(1.4) blur(var(--glass-blur));border:1px solid var(--glass-border);border-radius:12px;padding:12px 15px;margin-bottom:8px;box-shadow:var(--shadow)}
+  .av{width:40px;height:40px;border-radius:50%;background:linear-gradient(135deg,var(--brand),#0f766e);color:#fff;display:flex;align-items:center;justify-content:center;font-weight:800}
+  .badge{font-size:11px;font-weight:800;padding:2px 9px;border-radius:999px;text-transform:capitalize}
+  .badge.approved{background:color-mix(in srgb,#22c55e 16%,transparent);color:#15803d}
+  .badge.pending{background:color-mix(in srgb,#f59e0b 16%,transparent);color:#b45309}
+  .badge.denied{background:color-mix(in srgb,#94a3b8 20%,transparent);color:var(--muted)}
+  .spacer{margin-left:auto}
+
+  /* Modal */
+  .backdrop{position:fixed;inset:0;background:rgba(10,20,15,.42);backdrop-filter:blur(3px);display:flex;align-items:center;justify-content:center;padding:16px;z-index:50}
+  .modal{width:100%;max-width:460px;background:var(--glass-strong);backdrop-filter:saturate(1.6) blur(24px);-webkit-backdrop-filter:saturate(1.6) blur(24px);border:1px solid var(--glass-border);border-radius:16px;box-shadow:var(--shadow-lg)}
+  .mh{display:flex;align-items:center;justify-content:space-between;padding:16px 20px;border-bottom:1px solid var(--glass-border)}
+  .mh h2{margin:0;font-size:18px;letter-spacing:-.02em}.mbody{padding:20px}
+  .field{display:flex;flex-direction:column;gap:6px;margin-bottom:14px}
+  .field label{font-size:12px;font-weight:700;color:var(--fg)}
+  .field input{border:1px solid var(--glass-border);border-radius:11px;padding:11px 13px;font-size:14px;font-family:inherit;background:var(--glass-strong);color:var(--fg);outline:none}
+  .field input:focus{border-color:var(--accent);box-shadow:0 0 0 4px color-mix(in srgb,var(--accent) 16%,transparent)}
+  .g2{display:grid;grid-template-columns:1fr 1fr;gap:12px}.mfoot{display:flex;justify-content:flex-end;gap:8px;margin-top:6px}
+  .sw{display:flex;gap:8px;flex-wrap:wrap}.swb{width:28px;height:28px;border-radius:50%;border:0;cursor:pointer}.swb.on{outline:2px solid var(--fg);outline-offset:2px}
+  .toast{position:fixed;bottom:22px;left:50%;transform:translateX(-50%);background:var(--glass-strong);color:var(--fg);border:1px solid var(--glass-border);backdrop-filter:blur(18px);padding:11px 17px;border-radius:11px;font-size:13px;opacity:0;transition:.2s;z-index:60;box-shadow:var(--shadow-lg)}.toast.show{opacity:1}
   .hide{display:none}
   input[type=file]{display:none}
 </style>
+<script>
+(function(){var t=localStorage.getItem('roognis_theme')||((window.matchMedia&&matchMedia('(prefers-color-scheme:dark)').matches)?'dark':'light');document.documentElement.setAttribute('data-theme',t);})();
+function toggleTheme(){var d=document.documentElement,n=d.getAttribute('data-theme')==='dark'?'light':'dark';d.setAttribute('data-theme',n);localStorage.setItem('roognis_theme',n);var b=document.getElementById('themeBtn');if(b)b.textContent=n==='dark'?'☀️':'🌙';}
+document.addEventListener('DOMContentLoaded',function(){var b=document.getElementById('themeBtn');if(b)b.textContent=document.documentElement.getAttribute('data-theme')==='dark'?'☀️':'🌙';});
+</script>
 </head>
 <body>
 <header><div class="wrap hbar">
-  <span class="logo"></span><span class="brand">Roognis</span><span class="pill">Teacher</span>
-  <a class="rightlink" href="/">Student view →</a>
+  <span class="logo"></span><span class="brand">Roognis</span><span class="pill">Classroom</span>
+  <a class="rightlink" href="/" style="margin-left:auto">Student view →</a>
+  <button id="themeBtn" class="hbtn" onclick="toggleTheme()" title="Toggle light / dark" style="margin-left:12px">🌙</button>
+  <span class="me" id="me" title="Teacher"></span>
 </div></header>
 <div id="app" class="wrap"></div>
 <div id="modalRoot"></div><div class="toast" id="toast"></div>
 
 <script>
-const COLORS=['#4f46e5','#1e8e3e','#e52592','#9334e6','#e8710a','#00897b','#d93025','#3949ab'];
+const COLORS=['#16a34a','#0d9488','#2563eb','#7c3aed','#db2777','#ea580c','#0891b2','#4f46e5'];
 const app=document.getElementById('app');
 const $=h=>{const t=document.createElement('template');t.innerHTML=h.trim();return t.content.firstChild};
 const api=(u,o)=>fetch(u,o).then(r=>r.ok?r.json():r.json().then(e=>Promise.reject(e)));
 const teacher = localStorage.getItem('roognis_teacher') || 'Ms. Rao';
 localStorage.setItem('roognis_teacher', teacher);
-function toast(t){const n=document.getElementById('toast');n.textContent=t;n.classList.add('show');setTimeout(()=>n.classList.remove('show'),1600)}
+document.getElementById('me').textContent = teacher.trim()[0].toUpperCase();
+function toast(t){const n=document.getElementById('toast');n.textContent=t;n.classList.add('show');setTimeout(()=>n.classList.remove('show'),1700)}
 function shade(hex,d){const n=parseInt(hex.slice(1),16),f=x=>Math.max(0,Math.min(255,x+d));return `rgb(${f((n>>16)&255)},${f((n>>8)&255)},${f(n&255)})`}
 function esc(s){return (s||'').replace(/[&<>]/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[m]))}
 function closeModal(){document.getElementById('modalRoot').innerHTML=''}
-let state={rooms:[],room:null,tab:'chapters'};
+let state={rooms:[],room:null,tab:'stream'};
 
+// ── Home: class cards ────────────────────────────────────────────────────────
 async function home(){
   state.rooms = await api('/api/teacher/classrooms'); state.room=null;
   const cards = state.rooms.map(r=>`
-    <div class="cc" data-r="${r.id}">
-      <div class="ban" style="background:linear-gradient(135deg,${r.color},${shade(r.color,-30)})">
-        <h3>${esc(r.name)}</h3><div class="s">${esc(r.teacher||'')}${r.seed?' · demo':''}</div>
-        <div class="mono" style="background:${shade(r.color,-40)};color:#fff">${r.icon||'📘'}</div>
+    <div class="gc-card" data-r="${r.id}">
+      <div class="gc-banner" style="background:linear-gradient(120deg,${r.color},${shade(r.color,-34)})">
+        <h3>${esc(r.name)}</h3>
+        <div class="sec">${esc(r.section?('Section '+r.section):(r.subject||''))}</div>
+        <div class="tch">${esc(r.teacher||'')}</div>
+        <div class="gc-avatar" style="color:${r.color}">${r.icon||'📘'}</div>
       </div>
-      <div class="body"><span>📚 ${r.chapters.length} chapters</span><span>👥 ${(r.chapters.reduce((a,c)=>a,0),'')}</span>
-        <span class="spacer" style="font-family:ui-monospace;letter-spacing:.1em">${r.join_code}</span></div>
+      <div class="gc-body"></div>
+      <div class="gc-foot"><span>👥 ${r.students || 0} students</span><span>📂 ${r.chapters.length} topics</span></div>
     </div>`).join('');
-  app.innerHTML=`<div class="row"><div><h1>Classes</h1><div class="sub">Create classes, add chapters, upload PDFs and review what students ask.</div></div>
+  app.innerHTML=`<div class="row"><div><h1>Classes</h1><div class="sub">Create a class, add topics, and upload the material your students will learn from.</div></div>
      <button class="btn" id="new">＋ Create class</button></div>
-     ${state.rooms.length?`<div class="grid">${cards}</div>`:`<div class="empty" style="margin-top:24px">No classes yet.</div>`}`;
+     ${state.rooms.length?`<div class="gc-grid">${cards}</div>`
+       :`<div class="empty" style="margin-top:26px"><div class="big">🏫</div>
+          <div style="font-weight:700;color:var(--fg);font-size:16px;margin-bottom:4px">No classes yet</div>
+          Create your first class, then add a topic and upload a PDF — that becomes the material your students learn from.</div>`}`;
   document.getElementById('new').onclick=createModal;
-  app.querySelectorAll('.cc').forEach(el=>el.onclick=()=>openRoom(el.dataset.r));
+  app.querySelectorAll('.gc-card').forEach(el=>el.onclick=()=>openRoom(el.dataset.r));
 }
 
 function createModal(){
   let color=COLORS[state.rooms.length%COLORS.length];
   const m=$(`<div class="backdrop"><div class="modal">
-    <div class="mh"><h2>Create class</h2><button class="btn ghost" onclick="closeModal()">✕</button></div>
+    <div class="mh"><h2>Create class</h2><button class="hbtn" onclick="closeModal()">✕</button></div>
     <div class="mbody">
-      <div class="field"><label>Class name</label><input id="f_name" placeholder="e.g. Class 10 Robotics"></div>
-      <div class="g2"><div class="field"><label>Subject</label><input id="f_sub" placeholder="Robotics"></div>
+      <div class="field"><label>Class name (required)</label><input id="f_name" placeholder="e.g. Class 10 Physics"></div>
+      <div class="g2"><div class="field"><label>Subject</label><input id="f_sub" placeholder="Physics"></div>
         <div class="field"><label>Section</label><input id="f_sec" placeholder="A"></div></div>
-      <div class="field"><label>Icon (emoji)</label><input id="f_icon" placeholder="🤖" maxlength="2"></div>
+      <div class="field"><label>Icon (emoji)</label><input id="f_icon" placeholder="🔬" maxlength="2"></div>
       <div class="field"><label>Theme</label><div class="sw" id="sw"></div></div>
       <div class="mfoot"><button class="btn ghost" onclick="closeModal()">Cancel</button><button class="btn" id="f_go">Create</button></div>
     </div></div></div>`);
@@ -130,7 +202,7 @@ function createModal(){
   COLORS.forEach(c=>{const b=document.createElement('button');b.className='swb'+(c===color?' on':'');b.style.background=c;
     b.onclick=()=>{color=c;sw.querySelectorAll('.swb').forEach(x=>x.classList.remove('on'));b.classList.add('on')};sw.appendChild(b)});
   m.querySelector('#f_go').onclick=async()=>{
-    const name=m.querySelector('#f_name').value.trim(); if(!name)return;
+    const name=m.querySelector('#f_name').value.trim(); if(!name){toast('Class name is required');return;}
     await api('/api/teacher/classrooms',{method:'POST',headers:{'Content-Type':'application/json'},
       body:JSON.stringify({name,subject:m.querySelector('#f_sub').value,section:m.querySelector('#f_sec').value,
       icon:m.querySelector('#f_icon').value,color,teacher})});
@@ -138,37 +210,72 @@ function createModal(){
   };
 }
 
-async function openRoom(id){
-  state.room = state.rooms.find(r=>r.id===id); state.tab='chapters'; renderRoom();
-}
+// ── Class detail: Stream / Classwork / People ────────────────────────────────
+async function openRoom(id){ state.room = state.rooms.find(r=>r.id===id); state.tab='stream'; renderRoom(); }
 function renderRoom(){
   const r=state.room;
   app.innerHTML=`<button class="back" onclick="home()">‹ Classes</button>
-    <div class="band" style="background:linear-gradient(135deg,${r.color},${shade(r.color,-30)})">
-      <div class="mono">${r.icon||'📘'}</div><div><h2>${esc(r.name)}</h2><div class="s">${esc(r.teacher||'')}</div></div>
-      <div class="code"><div class="l">Class code</div><div class="v">${r.join_code}</div></div></div>
+    <div class="hero" style="background:linear-gradient(120deg,${r.color},${shade(r.color,-36)})">
+      <span class="deco">${r.icon||'📘'}</span>
+      <div class="code"><div class="l">Class code</div><div class="v">${r.join_code}</div></div>
+      <h2>${esc(r.name)}</h2><div class="s">${esc(r.section?('Section '+r.section+' · '):'')}${esc(r.subject||'')} · ${esc(r.teacher||'')}</div>
+    </div>
     <div class="tabs">
-      <button class="tab" data-t="chapters">Chapters</button>
-      <button class="tab" data-t="students">Students</button>
-      <button class="tab" data-t="insights">Student activity</button>
+      <button class="tab" data-t="stream">Stream</button>
+      <button class="tab" data-t="classwork">Classwork</button>
+      <button class="tab" data-t="people">People</button>
+      <button class="btn ghost sm" id="delclass" style="margin-left:auto;align-self:center">🗑 Delete class</button>
     </div><div class="pane" id="pane"></div>`;
+  document.getElementById('delclass').onclick=async()=>{
+    if(!confirm(`Delete "${r.name}" and all its topics, material and roster?`))return;
+    await api(`/api/teacher/classrooms/${r.id}`,{method:'DELETE'});
+    toast('Class deleted');home();
+  };
   app.querySelectorAll('.tab').forEach(t=>t.onclick=()=>{state.tab=t.dataset.t;renderRoom()});
   app.querySelector(`.tab[data-t="${state.tab}"]`).classList.add('on');
-  ({chapters:paneChapters,students:paneStudents,insights:paneInsights}[state.tab])();
+  ({stream:paneStream,classwork:paneClasswork,people:panePeople}[state.tab])();
 }
 
-async function paneChapters(){
+// Stream — class code + live student activity feed
+async function paneStream(){
+  const pane=document.getElementById('pane'); const r=state.room;
+  const cs=await api(`/api/teacher/classrooms/${r.id}/conversations`);
+  const feed = cs.length ? cs.map(c=>`
+    <div class="post" data-c="${c.id}">
+      <div class="ph"><div class="av">${(c.student_name||'?')[0].toUpperCase()}</div>
+        <div><b>${esc(c.student_name||'Student')}</b> asked in <b>${esc(c.chapter_title||'a topic')}</b>
+        <div class="m">${esc(c.title||'')} · ${c.msg_count} messages</div></div></div>
+      <div class="msgs" id="m-${c.id}"></div>
+    </div>`).join('') : `<div class="empty">When your students ask the AI tutor questions, their conversations appear here for you to review.</div>`;
+  pane.innerHTML=`<div class="two">
+    <div class="panel"><h4>Class code</h4><div class="codebig">${r.join_code}</div>
+      <div class="sub" style="margin-top:8px">Share this so students can join the class.</div></div>
+    <div><div class="sub" style="margin-bottom:12px;font-weight:700;color:var(--fg)">Recent activity</div>${feed}</div>
+  </div>`;
+  pane.querySelectorAll('.post').forEach(el=>el.onclick=async()=>{
+    const box=el.querySelector('.msgs');
+    if(box.style.display==='flex'){box.style.display='none';return}
+    const ms=await api(`/api/conversation/${el.dataset.c}/messages`);
+    box.innerHTML=ms.map(m=>`<div class="mb ${m.role==='user'?'user':'ai'}">${esc(m.content)}
+      ${m.decision?`<div class="dtag">${m.decision.replace('_',' ')}</div>`:''}</div>`).join('');
+    box.style.display='flex';
+  });
+}
+
+// Classwork — topics (chapters) with materials (PDFs)
+async function paneClasswork(){
   const pane=document.getElementById('pane'); const r=state.room;
   const chs=await api(`/api/teacher/classrooms/${r.id}/chapters`);
-  pane.innerHTML=`<div class="row" style="margin-bottom:12px"><div class="sub">${chs.length} chapters</div>
-     <button class="btn sm" id="addch">＋ Add chapter</button></div><div id="chlist"></div>`;
-  document.getElementById('addch').onclick=()=>addChapterModal(r.id);
-  const list=document.getElementById('chlist');
-  for(const [i,ch] of chs.entries()){
-    const row=$(`<div><div class="listrow"><div class="num">${i+1}</div>
-      <div><h4>${esc(ch.title)}</h4><div class="m">${esc(ch.summary||'')}</div></div>
-      <button class="btn ghost sm spacer" data-up="${ch.id}">⬆ Upload PDF</button></div>
-      <div class="docs" id="docs-${ch.id}"></div></div>`);
+  pane.innerHTML=`<div class="row" style="margin-bottom:18px"><div class="sub">${chs.length} topic${chs.length===1?'':'s'}</div>
+     <button class="btn sm" id="addch">＋ Create topic</button></div><div id="tlist"></div>
+     ${chs.length?'':`<div class="empty">No topics yet. Create a topic (e.g. a chapter), then add material — a PDF — and your students can learn from it.</div>`}`;
+  document.getElementById('addch').onclick=()=>addTopicModal(r.id);
+  const list=document.getElementById('tlist');
+  for(const ch of chs){
+    const row=$(`<div class="topic">
+      <div class="topic-h"><h3>${esc(ch.title)}</h3><span class="tsum">${esc(ch.summary||'')}</span>
+        <button class="btn ghost sm spacer" data-up="${ch.id}">⬆ Add material</button></div>
+      <div id="docs-${ch.id}"></div></div>`);
     list.appendChild(row);
     row.querySelector('[data-up]').onclick=()=>pickFile(ch.id);
     loadDocs(ch.id);
@@ -179,66 +286,76 @@ function pickFile(chid){
   inp.onchange=async()=>{const f=inp.files[0];if(!f)return;
     const fd=new FormData();fd.append('file',f);
     toast('Uploading '+f.name+'…');
-    try{ await api(`/api/teacher/chapters/${chid}/documents`,{method:'POST',body:fd});
-      pollDocs(chid); }catch(e){toast(e.detail||'Upload failed')}
+    try{ await api(`/api/teacher/chapters/${chid}/documents`,{method:'POST',body:fd}); pollDocs(chid); }
+    catch(e){toast(e.detail||'Upload failed')}
   };inp.click();
 }
 async function loadDocs(chid){
   const docs=await api(`/api/teacher/chapters/${chid}/documents`);
   const el=document.getElementById('docs-'+chid); if(!el)return;
-  el.innerHTML=docs.map(d=>`<div class="doc">📄 ${esc(d.filename)} <span class="stt ${d.status}">${d.status}</span>
-     ${d.status==='ready'?`· ${d.pages}p · ${d.chunk_count} chunks`:''}${d.error?`· ${esc(d.error)}`:''}</div>`).join('')
-     || `<div class="doc" style="opacity:.6">No documents yet — upload a PDF to teach this chapter.</div>`;
+  el.innerHTML=docs.map(d=>`<div class="mat"><div class="mi">📄</div>
+     <div><h5>${esc(d.filename)}</h5><div class="mm">${d.status==='ready'?`${d.pages} pages · ${d.chunk_count} chunks indexed`:(d.error?esc(d.error):'PDF material')}</div></div>
+     <span class="stt ${d.status}">${d.status}</span></div>`).join('')
+     || `<div class="matempty">No material yet — add a PDF and it becomes what the tutor teaches from.</div>`;
 }
 function pollDocs(chid){let n=0;const t=setInterval(async()=>{await loadDocs(chid);n++;
   const el=document.getElementById('docs-'+chid);
   if(n>20 || (el && !el.innerHTML.includes('processing'))){clearInterval(t)}},1500);}
 
-function addChapterModal(cid){
-  const m=$(`<div class="backdrop"><div class="modal"><div class="mh"><h2>Add chapter</h2>
-    <button class="btn ghost" onclick="closeModal()">✕</button></div><div class="mbody">
-    <div class="field"><label>Title</label><input id="c_t" placeholder="e.g. Electromagnetism"></div>
+function addTopicModal(cid){
+  const m=$(`<div class="backdrop"><div class="modal"><div class="mh"><h2>Create topic</h2>
+    <button class="hbtn" onclick="closeModal()">✕</button></div><div class="mbody">
+    <div class="field"><label>Topic title</label><input id="c_t" placeholder="e.g. Chapter 3 — Refraction of Light"></div>
     <div class="field"><label>Summary (optional)</label><input id="c_s" placeholder="Short description"></div>
-    <div class="mfoot"><button class="btn ghost" onclick="closeModal()">Cancel</button><button class="btn" id="c_go">Add</button></div>
+    <div class="mfoot"><button class="btn ghost" onclick="closeModal()">Cancel</button><button class="btn" id="c_go">Create</button></div>
     </div></div></div>`);
   document.getElementById('modalRoot').appendChild(m);
-  m.querySelector('#c_go').onclick=async()=>{const t=m.querySelector('#c_t').value.trim();if(!t)return;
+  m.querySelector('#c_go').onclick=async()=>{const t=m.querySelector('#c_t').value.trim();if(!t){toast('Enter a title');return;}
     await api(`/api/teacher/classrooms/${cid}/chapters`,{method:'POST',headers:{'Content-Type':'application/json'},
       body:JSON.stringify({title:t,summary:m.querySelector('#c_s').value})});
-    closeModal();toast('Chapter added');renderRoom();};
+    closeModal();toast('Topic created');renderRoom();};
 }
 
-async function paneStudents(){
+// People — teachers + students
+async function panePeople(){
   const pane=document.getElementById('pane'); const r=state.room;
   const en=await api(`/api/teacher/classrooms/${r.id}/students`);
-  pane.innerHTML=`<div class="sub" style="margin-bottom:12px">Share code <b style="font-family:ui-monospace">${r.join_code}</b> — students request to join, you approve.</div>`
-    + (en.length?en.map(e=>`<div class="person"><div class="av">${(e.student_name||'?')[0].toUpperCase()}</div>
-        <div><h4 style="margin:0">${esc(e.student_name)}</h4><div class="m"><span class="badge ${e.status}">${e.status}</span></div></div>
-        <div class="spacer" style="display:flex;gap:6px">
-          ${e.status!=='approved'?`<button class="btn green sm" data-a="approve" data-s="${e.student_id}">Approve</button>`:''}
-          ${e.status!=='denied'?`<button class="btn red sm" data-a="deny" data-s="${e.student_id}">Deny</button>`:''}
-        </div></div>`).join(''):`<div class="empty">No join requests yet.</div>`);
+  const students = en.length ? en.map(e=>`<div class="person"><div class="av">${(e.student_name||'?')[0].toUpperCase()}</div>
+      <div><h4 style="margin:0;font-size:14.5px">${esc(e.student_name)}</h4><div><span class="badge ${e.status}">${e.status}</span></div></div>
+      <div class="spacer" style="display:flex;gap:6px">
+        ${e.status!=='approved'?`<button class="btn green sm" data-a="approve" data-s="${e.student_id}">Approve</button>`:''}
+        ${e.status!=='denied'?`<button class="btn red sm" data-a="deny" data-s="${e.student_id}">Remove</button>`:''}
+      </div></div>`).join('') : `<div class="matempty">No students yet. Share class code <b class="codebig" style="font-size:14px">${r.join_code}</b> so they can join.</div>`;
+  pane.innerHTML=`<div class="plabel">Teachers</div>
+    <div class="person"><div class="av">${teacher.trim()[0].toUpperCase()}</div>
+      <div><h4 style="margin:0;font-size:14.5px">${esc(teacher)}</h4><div class="sub" style="font-size:12px">Class owner</div></div></div>
+    <div class="plabel" style="display:flex;align-items:center;justify-content:space-between">Students
+      <button class="btn sm" id="addstu">＋ Add student</button></div>${students}`;
+  document.getElementById('addstu').onclick=()=>addStudentModal(r.id);
   pane.querySelectorAll('[data-a]').forEach(b=>b.onclick=async()=>{
     await api(`/api/teacher/classrooms/${r.id}/students/${b.dataset.s}/${b.dataset.a}`,{method:'POST'});
-    toast('Updated');paneStudents();});
+    toast('Updated');panePeople();});
 }
 
-async function paneInsights(){
-  const pane=document.getElementById('pane'); const r=state.room;
-  const cs=await api(`/api/teacher/classrooms/${r.id}/conversations`);
-  pane.innerHTML=`<div class="sub" style="margin-bottom:12px">Review what students are asking — every conversation is logged.</div>`
-    + (cs.length?cs.map(c=>`<div class="conv" data-c="${c.id}">
-        <div class="row"><b>${esc(c.student_name||'Student')}</b><span class="m" style="color:var(--muted);font-size:12px">${esc(c.chapter_title||'')} · ${c.msg_count} msgs</span></div>
-        <div class="m" style="color:var(--muted);font-size:12.5px;margin-top:2px">${esc(c.title||'')}</div>
-        <div class="msgs" id="m-${c.id}"></div></div>`).join(''):`<div class="empty">No student activity yet.</div>`);
-  pane.querySelectorAll('.conv').forEach(el=>el.onclick=async()=>{
-    const box=el.querySelector('.msgs');
-    if(box.style.display==='flex'){box.style.display='none';return}
-    const ms=await api(`/api/conversation/${el.dataset.c}/messages`);
-    box.innerHTML=ms.map(m=>`<div class="mb ${m.role==='user'?'user':'ai'}">${esc(m.content)}
-       ${m.decision?`<div class="dtag">${m.decision.replace('_',' ')}</div>`:''}</div>`).join('');
-    box.style.display='flex';});
+function addStudentModal(cid){
+  const m=$(`<div class="backdrop"><div class="modal"><div class="mh"><h2>Add student</h2>
+    <button class="hbtn" onclick="closeModal()">✕</button></div><div class="mbody">
+    <div class="field"><label>Student name</label><input id="s_n" placeholder="e.g. Ananya Sharma"></div>
+    <div class="sub" style="margin:-4px 0 12px;font-size:12px">They're added to the roster immediately —
+      when they open the student portal with this name, this class is there.</div>
+    <div class="mfoot"><button class="btn ghost" onclick="closeModal()">Cancel</button>
+      <button class="btn" id="s_go">Add to class</button></div>
+    </div></div></div>`);
+  document.getElementById('modalRoot').appendChild(m);
+  const inp=m.querySelector('#s_n'); inp.focus();
+  const go=async()=>{const n=inp.value.trim();if(!n){toast('Enter a name');return;}
+    await api(`/api/teacher/classrooms/${cid}/students`,{method:'POST',
+      headers:{'Content-Type':'application/json'},body:JSON.stringify({name:n})});
+    closeModal();toast(n+' added');panePeople();};
+  m.querySelector('#s_go').onclick=go;
+  inp.onkeydown=e=>{if(e.key==='Enter')go()};
 }
+
 home();
 </script>
 </body>
